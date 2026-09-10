@@ -1,0 +1,27 @@
+master:
+  push:
+    - docker:
+        image: oven/bun:1.3.14
+      imports: https://cnb.cool/IceCream/keys/-/blob/master/eo_huijuan.yml
+      stages:
+        - apt-get update && apt-get install -y --no-install-recommends git
+        - bun install
+        - bun run docs:build
+        - name: deploy
+          image: tencentcom/deploy-eopages:latest
+          script: edgeone pages deploy ./docs/.vitepress/dist -n ako-doc -t $EO_KEY
+
+$:
+  vscode:
+    - docker:
+        image: ${CNB_DOCKER_REGISTRY}/icecream/bun-codex-dev-env:latest
+        # build: .ide/Dockerfile
+      services:
+        - vscode
+        - docker
+      stages:
+        - name: clone repos
+          script: |
+            mkdir repos && cd repos && \
+            git clone https://github.com/AkoProject/Frontend
+            git clone https://github.com/AkoProject/JVM
