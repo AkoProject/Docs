@@ -1,177 +1,202 @@
 ---
-title: ako-rain 内置工具
-description: ako-rain 与 ako-core 为 JVM 业务代码提供的运行时、模型和查询工具。
+title: 内置工具
+description: 对比 ako-rain 与 ako-spring 的 Runtime、Access、事务和元数据工具。
 ---
 
-# `ako-rain` 内置工具
+# 内置工具
 
-本页面向已经接入 `ako-rain` 的 JVM 应用，集中说明业务代码可以直接使用的工具。协议数据结构见 [Ako 协议](/protocol/overview)，Rain 自身的 DI、生命周期和 Web 工具见 [Rain 文档](https://rain.icecreamqaq.com/)。
+JVM 模块提供两层工具：`ako-core` 的协议/元数据工具在两个框架中通用，`ako-rain` 与 `ako-spring` 则分别提供宿主框架相关的 Runtime、Access 查找和事务入口。
 
-## 运行时 `AkoRain`
+## Runtime
 
-`AkoRain` 是 Rain ApplicationService、ClassRegister 和 AkoRuntime 的组合：
+| 工具 | `ako-rain` | `ako-spring` |
+| --- | --- | --- |
+| 全局实例 | `AkoRain.instance` | `AkoSpringRuntime.instance` |
+| Runtime 初始化 | Rain 模块配置创建 `AkoRain` | Boot 自动配置创建 `AkoSpringRuntime` |
+| 模型表 | 从 `accesses` 的模型类型生成 `modelMap` | 从 `AkoSpringDatabase.modelTypes` 生成 `modelMap` |
+| TypeProvider | 从 Rain DI 容器查找 | 先从 `ApplicationContext` 查找，再尝试无参构造 |
+| 事务依赖 | SmartAccess/JPA EntityManager | `PlatformTransactionManager`，没有事务管理器时执行普通代码块 |
 
-| 成员 | 用途 |
-| --- | --- |
-| `AkoRain.instance` | 获取当前全局 Rain 适配器实例。由模块初始化，不应手工创建第二个实例。 |
-| `context` | Rain DI 上下文，用于查找 Bean。 |
-| `db` | 从 SmartAccess 获取默认 JPA 服务上下文。 |
-| `accesses` | 已发现并实例化的 Access 列表。 |
-| `models` | Access 对应的模型类型列表。 |
-| `modelMap` | `model id -> ModelContext`，用于菜单和模型操作。 |
-| `transaction {}` | 在默认 EntityManager 上开启、提交或回滚事务。 |
+直接读取 Runtime 通常只适合扩展或诊断；业务代码优先使用下面的 Access、模型扩展和 `AkoService` 工具。
 
-应用通常不需要直接操作这些成员；使用标准 Controller 和 [数据访问工具](/backend/rain/data-access) 即可。直接读取 `accesses`/`modelMap` 适合编写管理扩展或调试工具。
+## Access 查找与模型操作
 
-## Access 查找
+<script setup lang="ts">
+const accessExamples = [
+  {
+    language: 'Kotlin',
+    framework: 'ako-rain',
+    code: `import ako.rain.\`fun\`.accessOfModel
+import ako.rain.\`fun\`.findAccess
 
-```kotlin
-import ako.rain.`fun`.accessOfModel
-import ako.rain.`fun`.findAccess
-import ako.rain.`fun`.transaction
+val access = findAccess<StudentAccess>()
+val sameAccess = student.findAccess()
+val byClass = accessOfModel(Student::class.java)
 
-val studentAccess = findAccess<StudentAccess>()
-val anotherAccess = accessOfModel(Student::class.java)
+student.save()
+student.delete()`,
+    note: 'findAccess/accessOfModel 从 AkoRain.instance.accesses 获取 Rain Access；save/delete 调用 SmartAccess/JPA。',
+  },
+  {
+    language: 'Kotlin',
+    framework: 'ako-spring',
+    code: `import ako.spring.\`fun\`.findAccess
 
-val student = Student(name = "Alice", age = 20)
+val repository = findAccess<StudentRepository>()
+
+student.save()
+student.delete()
+
+// 需要按模型查找上下文时：
+val context = AkoSpringRuntime.instance.modelMap["Student"]`,
+    note: 'Spring 的 findAccess 返回延迟代理，在调用时从 ApplicationContext 找到 Repository；模型上下文来自 AkoSpringDatabase。',
+  },
+]
+
+const transactionExamples = [
+  {
+    language: 'Kotlin',
+    framework: 'ako-rain',
+    code: `import ako.rain.\`fun\`.transaction
+
 transaction {
-    student.save()
-}
+  val student = Student.get(studentId) ?: Student.notExist()
+  student.name = newName
+  student.save()
+}`,
+    note: 'AkoRain.instance.transaction 取得 EntityManager；活动事务会复用，否则开始、提交或回滚事务。',
+  },
+  {
+    language: 'Kotlin',
+    framework: 'ako-spring',
+    code: `import ako.spring.\`fun\`.transaction
 
-// 删除已有实体：
 transaction {
-    existingStudent.delete()
-}
-```
+  val student = studentRepository.findById(studentId).orElseThrow()
+  student.name = newName
+  studentRepository.save(student)
+}`,
+    note: 'AkoSpringRuntime.transaction 使用 TransactionTemplate，传播行为为 REQUIRED；事务管理器由 Spring 提供。',
+  },
+]
+</script>
 
-可用函数：
+<CodeSwitch :variants="accessExamples" />
 
-| 函数 | 行为 |
-| --- | --- |
-| `findAccess<T>()` | 通过 Access 接口类型查找实例。 |
-| `accessOfModel<T>(modelType)` | 通过模型 Class 查找 Access。 |
-| `T.findAccess()` | 通过模型实例的 Class 查找 Access。 |
-| `T.save()` | 调用 Access 的 `saveOrUpdate` 并返回自身。 |
-| `T.delete()` | 调用 Access 删除当前实体。 |
-| `transaction {}` | 使用 `AkoRain.instance.transaction` 执行事务块。 |
+| 函数 | Rain 行为 | Spring 行为 |
+| --- | --- | --- |
+| `findAccess<T>()` | 从 `AkoRain.instance.accesses` 找到 Access 实例。 | 创建指向 Spring Bean 的代理，避免模型初始化时过早取 Bean。 |
+| `accessOfModel(Class)` | 按模型 Class 找 Access。 | 没有同名公共扩展；使用 `AkoSpringRuntime.modelMap` 或自己的数据库服务。 |
+| `model.findAccess()` | 按实例 Class 查找 Access。 | 当前没有同名扩展；使用 `findAccess<T>()` 或 `AkoSpringRuntime.modelMap`。 |
+| `model.save()` | 调用 `saveOrUpdate`。 | 调用 Runtime 和 Spring Data/数据库 SPI 的 `save`。 |
+| `model.delete()` | 调用 Access 删除。 | 读取模型 ID 后调用 Runtime 的 `delete`。 |
 
-这些查找函数依赖 Access 已被 Rain 扫描。需要完整参数、分页和软删除语义时，阅读 [数据访问与事务](/backend/rain/data-access)。
+找不到 Access、模型或数据库 Bean 时，两边都会抛出异常；请先检查扫描和 Runtime 初始化。
 
-## 查询参数工具
+## 事务工具
 
-`AkoAccess` 的 `whereQuery`/`wherePage` 支持：
+<CodeSwitch :variants="transactionExamples" />
 
-```text
-field             =
-field_eq          =
-field_gt          >
-field_gte         >=
-field_lt          <
-field_lte         <=
-field_ne          !=
-field_like        like
-field_in          in
-field_isNull      is null
-```
+两段代码同名是为了让业务层迁移更简单，但底层不是同一种事务：Rain 直接控制 EntityManager，Spring 委托 `PlatformTransactionManager`。事务传播、异常转换和外部副作用仍应按宿主框架测试。
 
-`AkoAccess.margeWhereQuery` 是底层查询条件构造器，名称中的 `marge` 是源码既有拼写。它返回要绑定的参数数组并把条件追加到查询字符串；只适合适配器内部使用，不要把客户端键名未经白名单直接交给它。
-
-## 错误工具 `webError`
-
-`webError` 创建并抛出 `WebError`：
-
-```kotlin
-import ako.`fun`.webError
-
-fun requireStudent(id: Int): Student =
-    Student.get(id) ?: webError(1001001, "学生不存在")
-```
-
-`WebError` 携带 `code` 和 `message`。Ako 核心不会替你决定 HTTP 错误响应格式；SmartWeb 全局异常处理器应把它转换成统一的业务错误响应，并避免泄露堆栈。
-
-## 模型元数据工具
+## 元数据工具
 
 ### `Class<T>.dbModel`
 
-`dbModel` 会从模型 Class 读取注解并生成 `DbModel`：
+`dbModel` 从模型 Class 读取 Ako 注解并生成 `DbModel`：
 
 ```kotlin
 val metadata = Student::class.java.dbModel
 println(metadata.fields.map { it.id })
 ```
 
-它会处理默认按钮、模型节点、字段显示信息、搜索/编辑校验和类型 Provider。`AkoRain` 通过它把已发现的模型放入 `modelMap`。
+它在两个框架中相同，会处理：
+
+- 模型名称、菜单组和默认节点。
+- 字段名称、类型、搜索、表格和编辑信息。
+- 校验、枚举、关联、按钮和面板。
+- `@NoAkoModel`/`@NoAkoField` 对暴露范围的影响。
+
+Runtime 只负责决定何时、从哪些模型类型调用它；元数据生成逻辑在 `ako-core`。
 
 ### `Field.dbField` / `readFieldInfo`
 
-这些工具把 Java Field 转为字段协议；高级适配器可以使用 `readFieldInfo` 生成自定义字段，但通常不应在业务代码中手工调用。自定义协议实现更适合显式构造 JSON 或实现自己的 metadata generator。
+这些反射工具把 JVM Field 转成字段协议，高级适配器可以使用它们生成自定义字段。普通业务不需要手工调用；如果要扩展字段，优先使用 [注解功能](/backend/rain/annotations) 或实现 `AkoTypeProvider`。
 
 ### `AkoDefaultNode`
 
-可以在模型元数据生成前修改全局默认节点：
+可以在建立模型元数据前修改全局默认节点：
 
 ```kotlin
 AkoDefaultNode.entityTable = "my-default-table"
 AkoDefaultNode.fieldTableColumn = "my-default-cell"
 ```
 
-可配置项包括 `view`、`icon`、`entitySearch`、`entityTable`、`entityEdit`、`fieldSearchInput`、`fieldSearchProperty`、`fieldEditInput`、`fieldEditProperty` 和 `fieldTableColumn`。它是进程级全局状态，必须在第一次建立 `modelMap` 前设置，不能按用户请求动态修改。
+可配置 `view`、`icon`、`entitySearch`、`entityTable`、`entityEdit`、`fieldSearchInput`、`fieldSearchProperty`、`fieldEditInput`、`fieldEditProperty` 和 `fieldTableColumn`。它是进程级状态，必须在模型第一次建立前设置，不能按用户请求动态改变。
 
 ## `AkoService`
 
-`AkoService` 是核心运行时注册表：
+`AkoService` 是两个 JVM 适配器共享的核心注册表：
 
-| 成员/函数 | 说明 |
+| 成员/函数 | 作用 |
 | --- | --- |
-| `runtime` | 当前 `AkoRuntime`，由 `AkoRain` 初始化。 |
-| `modelOf(modelName)` | 按模型 ID 找到 `ModelContext`，找不到时抛出 `WebError(881001001, ...)`。 |
+| `runtime` | 当前 `AkoRuntime`，由 `AkoRain` 或 `AkoSpringRuntime` 初始化。 |
+| `modelOf(modelName)` | 按模型 ID 获取 `ModelContext`；不存在时抛出 `WebError(881001001, ...)`。 |
 | `dbMenus` | 已发现的菜单组元数据。 |
-| `findMenu(annotation)` | 按 `MenuGroup.id` 查找或创建菜单组。ID 不能为空。 |
-| `registerDefaultTypeProvider(priority, provider)` | 注册 JVM 字段类型到 Ako TypeProvider 的默认映射。 |
-| `findDefaultTypeProvider(fieldType)` | 查找字段类型的默认 Provider。 |
+| `findMenu(annotation)` | 按 `@MenuGroup.id` 查找或创建菜单组。 |
+| `registerDefaultTypeProvider(priority, provider)` | 注册 JVM 字段类型到默认 Provider 的映射。 |
+| `findDefaultTypeProvider(fieldType)` | 查找某个 JVM 字段类型的 Provider。 |
 
-`AkoService.initRuntime` 通常由适配器调用；业务应用不应重复初始化全局运行时。
+适配器只在初始化时调用 `AkoService.initRuntime`。业务应用不应重复初始化，否则全局 Runtime 和默认 TypeProvider 会被覆盖。
+
+## TypeProvider
+
+JVM 自定义字段类型通过 `AkoTypeProvider` 生成字段类型、选项、默认搜索项和分页关联信息；前端仍必须注册同名 TypeProvider。
+
+```text
+readField       → field.type / field.options
+defaultSearch   → 没有显式 SearchType 时的搜索项
+searchInformation → 当前页的关联/补充信息
+```
+
+| 发现方式 | `ako-rain` | `ako-spring` |
+| --- | --- | --- |
+| 容器 | Rain DI | Spring `ApplicationContext` |
+| Provider Bean | 按 Rain Bean 规则注册 | 使用 `@Component` 等方式注册；也可由 Runtime 无参构造 |
+| 共享原因 | 两边都实现 `AkoRuntime.getTypeProvider` | Provider 接口属于 `ako-core`，不绑定宿主框架 |
+
+## 错误工具 `webError`
+
+`webError` 位于 `ako-core`，两个框架都可以使用：
+
+```kotlin
+import ako.`fun`.webError
+
+fun requireStudent(id: Int): Student =
+  Student.get(id) ?: webError(1001001, "学生不存在")
+```
+
+它抛出带 `code` 和 `message` 的 `WebError`。Rain SmartWeb 或 Spring MVC 全局异常处理器需要把它转换成应用统一的 HTTP 错误响应；Ako 不替应用决定错误格式，也不会自动隐藏敏感信息。
 
 ## 通用 core 工具
 
-`ako-core` 还提供一些与 Rain 无关的 JVM 扩展：
-
 | 工具 | 作用 | 注意 |
 | --- | --- | --- |
-| `String.md5` | 计算字符串 MD5。 | 不用于密码存储或安全签名；优先使用现代密码哈希/签名算法。 |
-| `File.md5` | 流式计算文件 MD5。 | 适合完整性校验，不代表抗碰撞安全。 |
-| `ByteArray.md5` | 计算字节数组 MD5。 | 同上。 |
-| `Class.allField` | 获取当前类及父类的全部声明字段。 | 反射结果包含内部字段，输出前要做过滤。 |
-| `Member.isStatic` | 判断反射成员是否 static。 | 元数据生成器使用。 |
-| `AnnotatedElement.annotation<T>()` | 读取单个注解。 | JVM 反射辅助。 |
-| `AnnotatedElement.hasAnnotation<T>()` | 判断是否有注解。 | JVM 反射辅助。 |
+| `String.md5` / `File.md5` / `ByteArray.md5` | 计算 MD5。 | 只适合完整性/兼容用途，不用于密码存储或安全签名。 |
+| `Class.allField` | 获取当前类及父类字段。 | 反射结果要过滤内部字段。 |
+| `Member.isStatic` | 判断反射成员是否 static。 | 元数据生成辅助。 |
+| `AnnotatedElement.annotation<T>()` | 读取注解。 | JVM 反射辅助。 |
+| `AnnotatedElement.hasAnnotation<T>()` | 判断注解存在。 | JVM 反射辅助。 |
 | `Annotation.annotationAnnotation<T>()` | 读取注解上的元注解。 | 自定义 `AkoType` 时使用。 |
-| `String.notEmptyOrNull()` | 空字符串转成 null。 | 主要用于按钮配置转换。 |
-
-这些工具会随着 `ako-core` API 演进，业务代码应尽量依赖稳定的模型、Access 和协议接口。
-
-## 自定义 TypeProvider
-
-JVM 侧可以通过 `AkoTypeProvider` 提供字段类型的默认搜索、字段选项和分页关联信息。Rain 适配器通过 `AkoRuntime.getTypeProvider` 从 DI 容器获取 Provider；前端还必须注册同名 TypeProvider。
-
-最小接口关注三个阶段：
-
-```text
-readField       → 生成 field.type / field.options
-defaultSearch  → 没有显式 SearchType 时生成搜索项
-searchInformation → 为当前页补充 information
-```
-
-后端自定义 Provider 的实现细节属于 JVM 扩展开发；跨语言适配器直接按 [字段类型与选项](/protocol/types) 输出 JSON 即可。
+| `String.notEmptyOrNull()` | 空字符串转 null。 | 按钮和配置转换辅助。 |
 
 ## 不要把工具当成安全边界
 
-`AkoService.modelOf`、`findAccess`、`webError` 和前端按钮工具都只是便捷 API。它们不会自动完成：
+`AkoService.modelOf`、`findAccess`、`webError`、按钮和前端校验都是便捷 API，不会自动完成：
 
-- 当前用户权限判断。
-- 多租户数据隔离。
-- 输入参数白名单。
-- 事务之外的外部副作用控制。
-- 生产环境错误脱敏。
+- 当前用户权限判断和租户隔离。
+- 字段、操作符、排序方向和主键的白名单。
+- 跨模型事务之外的外部副作用控制。
+- 生产错误脱敏和审计。
 
-这些判断必须由业务服务、控制器中间件和数据访问层共同完成。
+这些责任由 Rain/Spring 的控制器、服务、数据访问层和安全组件共同完成。

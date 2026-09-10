@@ -9,6 +9,10 @@ description: Ako 前端运行时、内置 API、弹窗、类型工具和按钮�
 
 本页介绍日常开发最常用的工具。完整的类型、组件 props 和节点约定见 [前端参考](/frontend/reference)；如果要调整后端返回的菜单和模型，阅读 [mixin 使用方法](/frontend/mixins)。
 
+## 文档代码块的框架选择
+
+JVM 文档中的 `ako-rain` / `ako-spring` 代码块使用同一个全局选择项。点击任意一个框架按钮后，其他 JVM 代码块会同步切换；页面刷新或重新打开文档后仍会保留选择。选择保存在浏览器 `localStorage` 的 `ako-code-switch-framework` 键中。
+
 ## 运行时 `Ako`
 
 `Ako` 是 Vue 插件，也是前端 API 和元数据的运行时容器：

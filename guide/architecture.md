@@ -38,7 +38,7 @@ Ako 把“页面怎么渲染”和“数据怎么保存”拆开。前端只认�
 | 协议核心 | `ako-core` | 定义 `DbModel`、`DbField`、按钮、查询请求和分页响应。 |
 | JPA 基础 | `ako-jpa` | 提供 JPA 模型基类、软删除模型和查询辅助。 |
 | Rain 适配 | `ako-rain` | 在 Rain + SmartWeb + SmartAccess 环境中发现模型、注册控制器并执行查询。 |
-| Spring 适配 | `spring-boot-3-jpa` 目录 | 正在推进；当前未在根构建启用，不作为稳定安装入口。 |
+| Spring 适配 | `ako-spring-common`、`ako-springboot-2/3/4`、`ako-springboot-springdata` | 由 Spring Boot 自动配置建立 Runtime；Boot 3/4 可直接使用 Spring Data JPA，Boot 2 可接入公共 SPI。 |
 
 ## 一次页面请求发生什么
 
@@ -80,7 +80,7 @@ POST model/page/{model}
 
 ## 协议优先带来的好处
 
-- 后端可以从 Rain 迁移到其他框架，而无需重写管理后台。
+- 后端可以从 Rain 迁移到 Spring 或其他框架，而无需重写管理后台。
 - 前端可以替换默认 UI，而不改变业务接口。
 - 协议可以单独做契约测试，不必把测试绑定到某一个 ORM。
 - 复杂业务可以保留手写页面，标准模型页面继续使用自动生成。

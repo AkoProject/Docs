@@ -1,11 +1,11 @@
 ---
 title: 注解功能
-description: ako-rain 中每个 Ako 注解的参数、前端效果和当前实现边界。
+description: JVM 适配器中每个 Ako 注解的参数、前端效果和当前实现边界。
 ---
 
 # 注解功能
 
-`ako-rain` 使用 `ako-core` 的 JVM 注解把模型声明转换成页面元数据。注解本身只描述意图，最终效果取决于：模型是否被 `AkoRain` 发现、前端是否注册对应组件、以及后端是否实现了实际业务校验。
+`ako-rain` 和 `ako-spring` 都使用 `ako-core` 的 JVM 注解把模型声明转换成页面元数据。注解本身只描述意图，最终效果取决于：模型是否被对应 Runtime 发现、前端是否注册对应组件、以及后端是否实现了实际业务校验。
 
 本页覆盖当前源码中的全部 Ako 注解，包括模型、菜单、字段、类型、校验、按钮和元注解。其他语言的适配器不需要复刻注解，只需要输出相同的协议结果。
 
@@ -19,9 +19,16 @@ import ako.annotation.types.*
 模型需要：
 
 1. 实现 `AkoModel`，通常继承 `CompleteModel`、`LongCompleteModel` 或 UUID 基类。
-2. 有对应的 `AkoAccess`/`SoftDeleteAccess`。
-3. 模型和 Access 在 `rain.scanPackages` 范围内。
-4. `AkoRain` 已注册，且能够取得 SmartAccess/JPA 服务。
+2. 有对应的数据访问入口：Rain 是 `AkoAccess`/`SoftDeleteAccess`，Spring Data 是 `AkoJpaRepository`/`SoftDeleteAccess`，自定义 Spring 数据库则由 `AkoSpringDatabase.modelTypes` 提供。
+3. 模型和数据访问入口能被宿主框架发现。
+4. 对应 Runtime 已注册，并且底层 JPA/数据访问服务可用。
+
+| 发现环节 | `ako-rain` | `ako-spring` |
+| --- | --- | --- |
+| Runtime | `AkoRain`，由 Rain 模块配置注册。 | `AkoSpringRuntime`，由 Boot 自动配置注册。 |
+| 模型来源 | Rain `ClassRegister` 发现 `AkoAccess`。 | Spring `ApplicationContext` 中的 Repository Bean，或 `AkoSpringDatabase`。 |
+| 自定义 Provider | Rain DI Bean。 | Spring Bean，或 Runtime 的无参构造回退。 |
+| 注解转换 | 共同使用 `Class<T>.dbModel`。 | 共同使用 `Class<T>.dbModel`。 |
 
 ## 1. 模型与菜单注解
 
@@ -84,7 +91,7 @@ class Order : CompleteModel()
 
 ### `@NoAkoModel`
 
-标记模型不进入 `AkoRain.modelMap` 和 `menu/list` 的 `models`。它仍可以被 ORM 或业务代码使用，适合内部实体、关联表和不希望暴露到管理后台的模型。
+标记模型不进入 `AkoRain.modelMap` 或 `AkoSpringRuntime.modelMap`，也不会出现在 `menu/list` 的 `models`。它仍可以被 ORM 或业务代码使用，适合内部实体、关联表和不希望暴露到管理后台的模型。
 
 ## 2. 字段显示注解
 
@@ -323,7 +330,7 @@ var owner: Int = 0
 
 ### `@AkoType`
 
-`@AkoType(provider = MyProvider::class)` 是元注解，用于把另一个注解绑定到 JVM `AkoTypeProvider`。Provider 必须能被当前 `AkoRuntime` 找到；在 Rain 中通常意味着它是可被 DI 获取的 Bean。
+`@AkoType(provider = MyProvider::class)` 是元注解，用于把另一个注解绑定到 JVM `AkoTypeProvider`。Provider 必须能被当前 `AkoRuntime` 找到：Rain 通常从 DI 容器获取，Spring 通常从 `ApplicationContext` 获取，当前 Spring Runtime 找不到 Bean 时还会尝试无参构造。
 
 ```kotlin
 @AkoType(MoneyProvider::class)
@@ -466,36 +473,80 @@ class Student : CompleteModel()
 
 ## 8. 注解组合示例
 
-```kotlin
-@DbName("学生", index = 10)
+下面的业务声明部分相同，只有实体代理、数据访问入口和 `findAccess` 包名随框架变化：
+
+<script setup lang="ts">
+const composedExamples = [
+  {
+    language: 'Kotlin',
+    framework: 'ako-rain',
+    code: `@DbName("学生", index = 10)
 @MenuGroup(id = "school", name = "学校管理", index = 10)
 @ModelButton(name = "导出", url = "/api/student/export", type = "primary")
 @Entity
 @Table
 data class Student(
-    @DbName("小组")
-    @Mapping(Group::class, display = "name")
-    @Column(name = "group_id")
-    var group: Int = 0,
+  @DbName("小组")
+  @Mapping(Group::class, display = "name")
+  @Column(name = "group_id")
+  var group: Int = 0,
 
-    @DbName("姓名")
-    @Required("请输入姓名")
-    @SearchType(SearchType.Type.Like)
-    var name: String = "",
+  @DbName("姓名")
+  @Required("请输入姓名")
+  @SearchType(SearchType.Type.Like)
+  var name: String = "",
 
-    @DbName("年龄")
-    @RangeValidate(min = 1)
-    @TableColumnWidth(100)
-    var age: Int = 18,
+  @DbName("年龄")
+  @RangeValidate(min = 1)
+  @TableColumnWidth(100)
+  var age: Int = 18,
 
-    @DbName("创建时间")
-    @Datetime
-    @EditIgnore
-    var createdAt: Long = 0,
+  @DbName("创建时间")
+  @Datetime
+  @EditIgnore
+  var createdAt: Long = 0,
 ) : CompleteModel()
 
-interface StudentAccess : SoftDeleteAccess<Student, Int>
-```
+interface StudentAccess : ako.rain.access.SoftDeleteAccess<Student, Int>`,
+    note: 'Rain 侧由 ClassRegister 发现 StudentAccess，并通过 Rain DI 获取实现。',
+  },
+  {
+    language: 'Kotlin',
+    framework: 'ako-spring',
+    code: `@DbName("学生", index = 10)
+@MenuGroup(id = "school", name = "学校管理", index = 10)
+@ModelButton(name = "导出", url = "/api/student/export", type = "primary")
+@Entity
+@Table
+open class Student : CompleteModel() {
+  @DbName("小组")
+  @Mapping(Group::class, display = "name")
+  @Column(name = "group_id")
+  open var group: Int = 0
+
+  @DbName("姓名")
+  @Required("请输入姓名")
+  @SearchType(SearchType.Type.Like)
+  open var name: String = ""
+
+  @DbName("年龄")
+  @RangeValidate(min = 1)
+  @TableColumnWidth(100)
+  open var age: Int = 18
+
+  @DbName("创建时间")
+  @Datetime
+  @EditIgnore
+  open var createdAt: Long = 0
+}
+
+interface StudentRepository : ako.spring.data.SoftDeleteAccess<Student, Int>`,
+    note: 'Spring Data 侧由 Repository Bean 提供数据访问；open class/open var 用于 JPA 代理。',
+  },
+]
+</script>
+
+<CodeSwitch :variants="composedExamples" />
 
 这段声明会形成：
 

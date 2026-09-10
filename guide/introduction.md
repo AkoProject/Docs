@@ -72,14 +72,13 @@ GET /menu/list/{channel}
 当前文档以两个源码仓库为依据：
 
 - 前端：[`AkoProject/Frontend`](https://github.com/AkoProject/Frontend)，Vue 3 + Element Plus，包名为 `@ako-dev/ako`。
-- JVM：[`AkoProject/JVM`](https://github.com/AkoProject/JVM)，包含协议核心、JPA 基础模型与 `ako-rain` 框架适配。
+- JVM：[`AkoProject/JVM`](https://github.com/AkoProject/JVM)，包含协议核心、JPA 基础模型、`ako-rain` 和 `ako-spring` 框架适配。
 - Rain：[`Rain JVM 文档`](https://rain.icecreamqaq.com/)，负责 `ako-rain` 所依赖的应用生命周期、控制器、SmartWeb 与 SmartAccess 生态。
-
-Spring 方向的源码目录已经出现，但在当前 JVM 根项目的 `settings.gradle.kts` 中仍未启用，因此本文把它标记为“推进中”，不会把它当作可直接复制的安装方式。
+- Spring：[`Spring Boot 文档`](https://docs.spring.io/spring-boot/docs/current/reference/html/)，`ako-spring` 已提供 Boot 2/3/4 自动配置和 Spring Data JPA 适配；具体模块组合见 [后端（JVM）项目创建](/backend/rain/project)。
 
 ## 下一步
 
 - 想快速看到完整链路：阅读 [快速开始](/guide/quick-start)。
 - 想实现自己的后端：先读 [Ako 协议](/protocol/overview)，再看 [后端实现概览](/backend/overview)。
-- 已经使用 Rain：直接进入 [后端（JVM）项目创建](/backend/rain/project)。
+- 已经使用 Rain 或 Spring Boot：直接进入 [后端（JVM）项目创建](/backend/rain/project)。
 - 想改造页面：阅读 [前端配置](/frontend/configuration)、[mixin 使用方法](/frontend/mixins) 与 [使用 Ako View 构建页面](/frontend/views)。

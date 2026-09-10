@@ -89,7 +89,7 @@ description: Ako 模型级按钮、行级按钮、编辑面板和自定义操作
 )
 ```
 
-按钮函数可以使用 `props.model`、`props.search()`、`props.edit()`、`props.api` 和 `props.dialog()` 等对象。上面的 Kotlin 注解只是 `ako-rain` 的写法；任何后端都可以直接输出同等的 `ButtonEntry` JSON。
+按钮函数可以使用 `props.model`、`props.search()`、`props.edit()`、`props.api` 和 `props.dialog()` 等对象。上面的 Kotlin 注解属于 JVM 共享的 Ako 注解；`ako-rain` 与 `ako-spring` 都可以生成同等的 `ButtonEntry` JSON，其他后端也可以直接输出协议结果。
 
 由于 `eval` 在浏览器中执行：
 

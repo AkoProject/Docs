@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import {
+  initializeCodeSwitchState,
+  selectedCodeFramework,
+  setCodeFramework,
+} from './codeSwitchState'
 
 export interface CodeVariant {
   id?: string
@@ -8,6 +13,8 @@ export interface CodeVariant {
   code: string
   note?: string
 }
+
+const persistentFrameworks = new Set(['ako-rain', 'ako-spring'])
 
 const props = withDefaults(defineProps<{
   variants: CodeVariant[]
@@ -19,17 +26,22 @@ const props = withDefaults(defineProps<{
 })
 
 const firstVariant = props.variants[0]
+const storedFramework = initializeCodeSwitchState().value
+const storedVariant = storedFramework
+  ? props.variants.find(it => persistentFrameworks.has(it.framework) && it.framework === storedFramework)
+  : undefined
+
 const initialLanguage = props.defaultLanguage && props.variants.some(it => it.language === props.defaultLanguage)
   ? props.defaultLanguage
-  : firstVariant?.language ?? ''
+  : storedVariant?.language ?? firstVariant?.language ?? ''
 const initialFramework = props.defaultFramework && props.variants.some(it =>
   it.language === initialLanguage && it.framework === props.defaultFramework,
 )
   ? props.defaultFramework
-  : props.variants.find(it => it.language === initialLanguage)?.framework ?? firstVariant?.framework ?? ''
+  : storedVariant?.framework ?? props.variants.find(it => it.language === initialLanguage)?.framework ?? firstVariant?.framework ?? ''
 
 const selectedLanguage = ref(initialLanguage)
-const selectedFramework = ref(initialFramework)
+const selectedFramework = ref(storedVariant?.framework ?? initialFramework)
 const copied = ref(false)
 
 const languageOptions = computed(() => Array.from(new Set(props.variants.map(it => it.language))))
@@ -64,7 +76,23 @@ function selectFramework(framework: string) {
     it.language === selectedLanguage.value && it.framework === framework,
   )
   if (firstForFramework) selectedLanguage.value = firstForFramework.language
+  if (persistentFrameworks.has(framework)) setCodeFramework(framework)
 }
+
+function applyGlobalFramework(framework: string | null) {
+  if (!framework || !persistentFrameworks.has(framework)) return
+  const variant = props.variants.find(it => it.framework === framework)
+  if (!variant) return
+  selectedFramework.value = variant.framework
+  selectedLanguage.value = variant.language
+}
+
+onMounted(() => {
+  const state = initializeCodeSwitchState()
+  applyGlobalFramework(state.value)
+})
+
+watch(selectedCodeFramework, framework => applyGlobalFramework(framework))
 
 async function copyCode() {
   const code = currentVariant.value.code

@@ -1,68 +1,99 @@
 ---
 title: 后端（JVM）
-description: ako-rain 的运行机制、项目组成和完整使用路线。
+description: Ako 在 JVM 上使用 ako-rain 与 ako-spring 的共同能力、差异和选择建议。
 ---
 
 # 后端（JVM）
 
-`ako-rain` 是当前 Ako 唯一完整接通的 JVM 框架适配器。它把 Ako 核心协议接到 Rain 的应用生命周期、SmartWeb 控制器和 SmartAccess/JPA 数据访问上。
+Ako 的 JVM 后端现在有两条可以接入同一套前端协议的实现：`ako-rain` 和 `ako-spring`。两者共享 `ako-core` 的模型、注解、元数据和分页协议；差异来自各自依赖的应用容器、Web 层、数据访问层和事务模型。
 
-## 适合谁
+## 先选择实现
 
-- 已经使用 Rain，希望快速得到标准管理后台。
-- 使用 Kotlin/JVM + JPA，需要统一的模型 CRUD 页面。
-- 想参考一个完整适配器，按协议实现其他语言或框架。
+下面的代码块会记住你选择的框架，并同步本网站其他 JVM 代码示例。选择会保存到浏览器的 `localStorage`，键名为 `ako-code-switch-framework`。
 
-Spring Boot 方向的目录仍在推进中，当前根构建没有启用；本组文档只把 `ako-rain` 当作可运行入口。
+<script setup lang="ts">
+const runtimeExamples = [
+  {
+    language: 'Kotlin',
+    framework: 'ako-rain',
+    code: `import rain.application.FullStackApplicationLauncher
 
-## 运行时如何工作
+fun main() {
+  FullStackApplicationLauncher.launch()
+}
 
-```text
-Rain 启动
-   │
-   ├── 加载 ako-rain 模块配置
-   ├── 注册 AkoRain ApplicationService / ClassRegister
-   ├── 扫描并收集 AkoAccess 接口
-   ├── 从 SmartAccess Bean 获取 Access 实例
-   ├── Access → 模型类型 → DbModel 元数据
-   └── IMenuController / IModelController 暴露 Ako HTTP 接口
-```
+// AkoRain 由 Rain 模块配置注册，负责发现 AkoAccess 和模型。`,
+    note: 'Rain 负责启动、扫描和 DI；ako-rain 使用 SmartWeb 暴露控制器，并使用 SmartAccess/JPA 访问数据。',
+  },
+  {
+    language: 'Kotlin',
+    framework: 'ako-spring',
+    code: `import org.springframework.boot.autoconfigure.SpringBootApplication
+import org.springframework.boot.runApplication
 
-`AkoRain` 初始化时把自己注册为 `AkoRuntime`，并在模型映射第一次使用时建立 `modelMap`。模型发现是惰性的，因此扫描包、Access 注册和 JPA 服务必须在第一次访问菜单/模型前完成。
+@SpringBootApplication
+class Application
 
-## 一个业务模块由什么组成
+fun main(args: Array<String>) {
+  runApplication<Application>(*args)
+}
 
-```text
-业务模型
-  ├── JPA Entity + Ako 注解
-  ├── AkoAccess / SoftDeleteAccess
-  ├── 可选：普通 SmartWeb 业务控制器
-  └── 由 AkoRain 转成 Model/Field/Button 元数据
-```
+// AkoSpringRuntime 由对应的 Boot 自动配置注册。`,
+    note: 'Spring Boot 负责启动、组件扫描和 Bean 生命周期；ako-spring 通过 AkoSpringDatabase 连接 Repository 或自定义数据实现。',
+  },
+]
+</script>
 
-推荐按下面顺序阅读：
+<CodeSwitch :variants="runtimeExamples" />
 
-1. [项目创建](/backend/rain/project)：依赖、目录和第一个 Rain 应用。
-2. [开始](/backend/rain/quick-start)：启动器、配置、控制器和运行检查。
-3. [实体模型](/backend/rain/models)：Entity、Access、字段和模型节点。
-4. [注解功能](/backend/rain/annotations)：每个 Ako 注解的参数和实际效果。
-5. [前端联动](/backend/rain/frontend)：模型声明如何变成前端页面。
-6. [数据访问与事务](/backend/rain/data-access)：查询、保存、删除、软删除和基类。
-7. [接入控制器](/backend/rain/controllers)：挂载菜单、模型和鉴权接口。
-8. [内置工具](/backend/rain/tools)：应用代码可调用的 Rain/Ako 工具函数。
+## 共同能力与框架差异
 
-## 与 Rain 的职责边界
+| 能力 | `ako-rain` | `ako-spring` | 为什么不同 |
+| --- | --- | --- | --- |
+| 应用启动 | `FullStackApplicationLauncher` | `SpringApplication` / `runApplication` | 两个框架的应用生命周期和类加载机制不同。 |
+| 组件发现 | Rain `ClassRegister` 发现 `AkoAccess` | Spring `ApplicationContext` 发现 `AkoAccess`/Repository Bean | 一个依赖 Rain 注册表，一个依赖 Spring Bean 容器。 |
+| Ako Runtime | `AkoRain` | `AkoSpringRuntime` | Runtime 必须绑定宿主框架的 DI、事务和模型发现方式。 |
+| 菜单/模型路由 | 实现 `IMenuController`、`IModelController` | 使用普通 Spring MVC Controller 调用 `Menu`、`Model` | SmartWeb 和 Spring MVC 的路由注解、参数绑定不同。 |
+| 数据访问 | `AkoAccess : JpaAccess`，由 SmartAccess 提供实现 | `AkoJpaRepository : JpaRepository`，由 Spring Data JPA 提供实现；也可自定义 `AkoSpringDatabase` | 两套 ORM/Repository API 不能直接互换。 |
+| 查询 | SmartAccess HQL/分页工具 | Jakarta Criteria API + Spring Data Repository | Spring 适配器需要在 Boot 3/4 的 Jakarta 生态中保持可移植。 |
+| 事务 | `EntityManager` 手动事务 | `PlatformTransactionManager` + `TransactionTemplate` | 事务管理器的所有权分别属于 SmartAccess 和 Spring。 |
+| 软删除 | 依赖 Hibernate Filter 和 QueryRewriter | 对 `SoftDeleteModel` 显式更新 `deleteTime`，查询时加入过滤条件 | 删除语义由底层数据访问实现决定，核心协议不规定软删除。 |
 
-| 能力 | Rain/生态 | Ako/ako-rain |
-| --- | --- | --- |
-| 应用启动、扫描、DI、生命周期 | Rain Application、DI | 注册 `AkoRain` 服务 |
-| HTTP 路由和参数绑定 | SmartWeb | 提供 `IMenuController`、`IModelController` |
-| 数据库、JPA、查询、事务 | SmartAccess + Hibernate | `AkoRainModelContext` 映射分页和 CRUD |
-| 管理后台页面描述 | — | `DbModel`、`DbField` 和按钮元数据 |
-| Vue 页面渲染 | — | 前端 `@ako-dev/ako` |
+## 共同的模型层
 
-需要理解 Rain 本身时，优先阅读 [Rain 快速开始](https://rain.icecreamqaq.com/guide/getting-started)、[DI 与配置](https://rain.icecreamqaq.com/modules/di)、[SmartWeb](https://rain.icecreamqaq.com/smartweb/) 和 [SmartAccess](https://rain.icecreamqaq.com/smartaccess/)。
+无论选择哪套实现，模型声明仍然使用 `ako-core`/`ako-jpa` 的同一组能力：
 
-## 当前版本注意
+- `@DbName`、`@Description`、`@ModelNode`、`@SearchType` 等注解。
+- `CompleteModel`、`LongCompleteModel`、UUID 基类。
+- `DbModel`、`DbField`、`ModelPageReq` 和 `ModelPageResp`。
+- `@Mapping`、`@DbEnum`、时间/大小类型和按钮元数据。
 
-Ako 和 Rain 仍处于开发版本。版本号、包坐标和 SmartAccess 实现可能变化；使用前请以 JVM 根项目和 `framework/rain/build.gradle.kts` 的组合为准。不要把本页的示例占位符当成固定发布版本。
+换框架通常不需要重写页面声明；需要替换的是启动、Access/Repository、控制器和数据库配置。
+
+## 适用场景
+
+| 你的项目 | 建议 |
+| --- | --- |
+| 已经是 Rain 应用，使用 SmartAccess/Hibernate | 选择 `ako-rain`，接入现有扫描和 ClassRegister。 |
+| 已经是 Spring Boot + Spring Data JPA | 选择 `ako-spring`，使用 Boot 3/4 模块和 `AkoJpaRepository`。 |
+| Spring Boot 2 + `javax.persistence` | 使用 `ako-springboot-2` + `ako-spring-common`，自行提供 `AkoSpringDatabase`；当前不承诺 Spring Data JPA 实现兼容。 |
+| 非 JPA 或多数据源 | 使用 `ako-spring-common`，为每个数据实现提供 `AkoSpringDatabase` Bean。 |
+| 需要最少的框架改造 | 先保持模型和协议不变，只替换适配器层。 |
+
+Spring Boot 2 与 Boot 3/4 的差异不是 Ako 注解差异，而是 `javax.persistence` 与 `jakarta.persistence` 以及对应 Spring Data 版本线不同。Spring 适配器把公共 Runtime 与 Boot 版本、数据库实现拆开，就是为了避免这些 API 互相泄漏。
+
+## 阅读顺序
+
+1. [项目创建](/backend/rain/project)：选择 Rain 或 Spring，并添加匹配依赖。
+2. [开始](/backend/rain/quick-start)：启动应用、配置数据库和挂载协议路由。
+3. [实体模型](/backend/rain/models)：声明 Entity、Access/Repository 和字段。
+4. [注解功能](/backend/rain/annotations)：查看每个 Ako 注解的前端效果。
+5. [前端联动](/backend/rain/frontend)：验证模型元数据如何驱动页面。
+
+数据访问、控制器和工具的深入说明放在 [开始](/backend/rain/quick-start) 页的进一步使用部分；它们也会根据所选框架给出对应代码。
+
+## 版本与实现状态
+
+JVM 根项目当前包含并启用：`ako-core`、`ako-jpa`、`ako-rain`、`ako-spring-common`、`ako-springboot-2`、`ako-springboot-3`、`ako-springboot-4` 和 `ako-springboot-springdata`。根版本当前为 `0.0.15`；Spring Boot 和 Rain 的版本请以各模块构建文件及制品仓库为准。
+
+Ako 协议仍然独立于 JVM。需要实现其他语言或 Web 框架时，阅读 [扩展参考](/extension/overview)。

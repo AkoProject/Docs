@@ -24,6 +24,6 @@ features:
 
 <div class="ako-home-note">
 
-Ako 当前已经打通 Vue 3 前端与 JVM 后端的 <code>ako-rain</code> 实现。协议层保持独立，其他语言和框架可以沿着同一份 HTTP 合约接入。
+Ako 当前已经打通 Vue 3 前端与 JVM 后端的 <code>ako-rain</code> 和 <code>ako-spring</code> 实现。协议层保持独立，其他语言和框架也可以沿着同一份 HTTP 合约接入。
 
 </div>

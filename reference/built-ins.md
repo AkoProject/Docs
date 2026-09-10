@@ -7,7 +7,7 @@ description: Ako 前端运行时、默认视图、类型提供者和常用工具
 
 > 这是旧路径兼容入口。前端用户请从 [前端工具](/frontend/tools) 开始；本页保留完整的历史参考内容。
 
-Ako 不只有一组 HTTP 接口。前端包还提供运行时对象、默认页面、类型提供者和一些可复用的工具函数；JVM/Rain 侧的工具则集中在 [ako-rain 内置工具](/backend/rain/tools)。正式的前端入口是 [前端工具](/frontend/tools)。
+Ako 不只有一组 HTTP 接口。前端包还提供运行时对象、默认页面、类型提供者和一些可复用的工具函数；JVM/Rain/Spring 侧的工具则集中在 [JVM 内置工具](/backend/rain/tools)。正式的前端入口是 [前端工具](/frontend/tools)。
 
 ## 前端运行时 `Ako`
 

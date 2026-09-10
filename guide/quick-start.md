@@ -1,6 +1,6 @@
 ---
 title: 快速开始
-description: 用 Vue 3 前端和 ako-rain 后端跑通 Ako 的最小链路。
+description: 用 Vue 3 前端和 JVM 后端跑通 Ako 的最小链路。
 ---
 
 # 快速开始
@@ -12,7 +12,7 @@ description: 用 Vue 3 前端和 ako-rain 后端跑通 Ako 的最小链路。
 ## 准备工作
 
 - Node.js 与一个 Vue 3 项目。
-- 一个能提供 Ako HTTP 协议的后端。当前可直接使用 `ako-rain`，其他后端需要自行实现 [交互规则](/protocol/http-api)。
+- 一个能提供 Ako HTTP 协议的后端。当前 JVM 可直接使用 `ako-rain` 或 `ako-spring`，其他后端需要自行实现 [交互规则](/protocol/http-api)。
 - 前后端通过同源路径或 CORS 互通。默认前端基地址是 `/api/ako/`。
 
 ## 1. 接入前端
@@ -23,7 +23,7 @@ description: 用 Vue 3 前端和 ako-rain 后端跑通 Ako 的最小链路。
 npm install @ako-dev/ako
 ```
 
-在应用入口挂载 Ako。下面的代码块支持在语言和框架之间切换；协议实现示例只展示接口边界，不代表 Spring 或其他适配器已经完成。
+在应用入口挂载 Ako。下面的代码块支持在语言和框架之间切换；协议实现示例只展示接口边界，具体后端接入方式见 JVM 后端文档。
 
 <script setup lang="ts">
 const bootstrapExamples = [
@@ -75,13 +75,12 @@ createApp(AkoBootView)
 
 ## 2. 接入后端
 
-当前最短路径是 `ako-rain`：
+当前 JVM 有两条最短路径：
 
-1. 使用 Rain 创建 JVM 应用。
-2. 添加 `ako-rain`、JPA 与 SmartAccess 依赖。
-3. 将应用模型包加入 Rain 扫描范围。
-4. 注册 `IMenuController` 与 `IModelController`。
-5. 提供 `auth/isAuth`；如果需要 Ako 自带登录页，再提供 `auth/login`。
+- `ako-rain`：使用 Rain 创建 JVM 应用，添加 SmartWeb/SmartAccess 依赖，把模型包加入扫描范围，并实现 `IMenuController` 与 `IModelController`。
+- `ako-spring`：使用 Spring Boot 创建应用，引入对应 Boot 自动配置和 Spring Data JPA，扫描 Repository，并用 Spring MVC Controller 调用 Ako 核心服务。
+
+两条路径都要提供 `auth/isAuth`；如果需要 Ako 自带登录页，再提供 `auth/login`。
 
 详细的依赖、配置和控制器代码在 [后端（JVM）项目创建](/backend/rain/project) 和 [开始](/backend/rain/quick-start)。Rain 本身的应用启动、扫描和 Web 配置请以 [Rain 快速开始](https://rain.icecreamqaq.com/guide/getting-started)、[SmartWeb 快速开始](https://rain.icecreamqaq.com/smartweb/getting-started) 为准。
 
@@ -123,5 +122,5 @@ curl -X POST http://localhost:17777/api/ako/model/page/Student \
 - [前端开始方式](/frontend/quick-start)：把自动生成后台嵌入现有 Vue 应用。
 - [后端（JVM）项目创建](/backend/rain/project)：准备 Rain 项目的依赖和目录。
 - [开始](/backend/rain/quick-start)：完善配置、控制器并检查接口。
-- [实体模型](/backend/rain/models)：使用 JVM + Rain 声明第一个模型。
+- [实体模型](/backend/rain/models)：使用 JVM + Rain/Spring 声明第一个模型。
 - [扩展参考](/extension/overview)：只有在实现其他语言/框架或自定义协议时再阅读。

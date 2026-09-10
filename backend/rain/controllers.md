@@ -1,20 +1,35 @@
 ---
-title: 接入控制器
-description: 在 Rain SmartWeb 中挂载 Ako 菜单、模型和认证接口。
+title: 控制器与接口
+description: 对比 ako-rain 与 ako-spring 如何挂载 Ako 菜单、模型和认证接口。
 ---
 
-# 接入控制器
+# 控制器与接口
 
-`ako-rain` 已经提供 `IMenuController` 和 `IModelController`。应用只需要把它们挂到自己的 Web Controller 根路径下，再补上认证控制器。
+Ako 前端只关心固定的 HTTP 路径和 JSON 形状；Rain 与 Spring 的控制器写法不同，但必须提供同一组接口。
 
-## 控制器根路径
+## 接口清单
 
-下面是当前 JVM 测试代码采用的最小挂载方式：
+| 方法 | 路径 | 用途 |
+| --- | --- | --- |
+| `GET` | `/api/ako/auth/isAuth` | 返回当前会话是否已认证。 |
+| `POST` | `/api/ako/auth/login` | 接收登录凭据并建立会话。 |
+| `GET` | `/api/ako/menu/list/{channel}` | 返回菜单组和模型元数据。 |
+| `POST` | `/api/ako/model/page/{model}` | 分页、查询和排序。 |
+| `POST` | `/api/ako/model/save/{model}` | 新增或保存实体。 |
+| `POST` | `/api/ako/model/delete/{model}` | 按 ID 列表删除实体。 |
 
-```kotlin
-package example.controller
+默认前端 `baseUrl` 是 `/api/ako/`，`channel` 是 `manager`。修改前端配置后，控制器根路径必须同步。
 
-import ako.rain.controller.IMenuController
+## 菜单与模型控制器
+
+### Rain：实现 Ako 控制器接口
+
+<script setup lang="ts">
+const controllerExamples = [
+  {
+    language: 'Kotlin',
+    framework: 'ako-rain',
+    code: `import ako.rain.controller.IMenuController
 import ako.rain.controller.IModelController
 import rain.controller.annotation.Path
 import smartweb.annotation.WebController
@@ -29,98 +44,167 @@ class MenuController : AkoController(), IMenuController
 
 @Path("model")
 @WebController
-class ModelController : AkoController(), IModelController
-```
+class ModelController : AkoController(), IModelController`,
+    note: 'IMenuController 和 IModelController 已经把 SmartWeb 路由、Model.page/save/delete 和 Rain 事务接起来。',
+  },
+  {
+    language: 'Kotlin',
+    framework: 'ako-spring',
+    code: `import ako.controller.Menu
+import ako.controller.Model
+import ako.model.req.ModelPageReq
+import ako.spring.\`fun\`.transaction
+import org.springframework.web.bind.annotation.*
 
-这组控制器提供：
+@RestController
+@RequestMapping("/api/ako/menu")
+class AkoMenuController {
+  @GetMapping("/list/{channel}")
+  fun list(@PathVariable channel: String) = Menu.list(channel)
+}
 
-| Controller | 路由 |
-| --- | --- |
-| `IMenuController` | `GET /api/ako/menu/list/{channel}` |
-| `IModelController` | `POST /api/ako/model/page/{model}` |
-|  | `POST /api/ako/model/save/{model}` |
-|  | `POST /api/ako/model/delete/{model}` |
+@RestController
+@RequestMapping("/api/ako/model")
+class AkoModelController {
+  @PostMapping("/page/{model}")
+  fun page(@PathVariable model: String, @RequestBody data: ModelPageReq) =
+    transaction { Model.page(model, data) }
+}`,
+    note: 'ako-spring 当前不提供 Rain 风格的控制器接口；用 Spring MVC 注解注册路由，并调用 Ako 核心服务。save/delete 以你的 JSON 绑定策略补上。',
+  },
+]
 
-`IModelController` 的默认方法会调用 Ako 核心模型服务，并在 `ako-rain` 中通过事务包装。Rain SmartWeb 的注解、路径和参数绑定规则请参考 [SmartWeb 快速开始](https://rain.icecreamqaq.com/smartweb/getting-started)、[路由与控制器](https://rain.icecreamqaq.com/smartweb/controllers)。
+const authExamples = [
+  {
+    language: 'Kotlin',
+    framework: 'ako-rain',
+    code: `@Path("auth")
+@WebController
+class AuthController : AkoController() {
+  @GetAction("isAuth")
+  fun isAuth(): Boolean = currentSessionIsAuthenticated()
+
+  @PostAction("login")
+  fun login(@RequestBody request: LoginRequest) {
+    authenticateAndCreateSession(request.username, request.password)
+  }
+}`,
+    note: 'GetAction/PostAction 来自 SmartWeb；认证函数是业务代码，需要接入真实用户系统。',
+  },
+  {
+    language: 'Kotlin',
+    framework: 'ako-spring',
+    code: `@RestController
+@RequestMapping("/api/ako/auth")
+class AuthController {
+  @GetMapping("/isAuth")
+  fun isAuth(): Boolean = currentSessionIsAuthenticated()
+
+  @PostMapping("/login")
+  fun login(@RequestBody request: LoginRequest) {
+    authenticateAndCreateSession(request.username, request.password)
+  }
+}`,
+    note: 'GetMapping/PostMapping 来自 Spring MVC；可以接入 Spring Security、Session 或自定义 Token。',
+  },
+]
+
+const businessExamples = [
+  {
+    language: 'Kotlin',
+    framework: 'ako-rain',
+    code: `@Path("api/student/{studentId}")
+@WebController
+class StudentItemController {
+  @PatchAction("point")
+  fun point(studentId: Int, point: Int, mode: Int) = transaction {
+    // 读取学生、校验权限、更新积分并提交事务
+  }
+}`,
+    note: 'SmartWeb 的路径参数和动作注解由 Rain 绑定。',
+  },
+  {
+    language: 'Kotlin',
+    framework: 'ako-spring',
+    code: `@RestController
+@RequestMapping("/api/student/{studentId}")
+class StudentItemController {
+  @PatchMapping("/point")
+  fun point(
+    @PathVariable studentId: Int,
+    @RequestParam point: Int,
+    @RequestParam mode: Int,
+  ) = transaction {
+    // 读取学生、校验权限、更新积分并提交事务
+  }
+}`,
+    note: 'Spring MVC 使用 PatchMapping、PathVariable 和 RequestParam；也可以用 RequestBody 接收结构化命令。',
+  },
+]
+</script>
+
+<CodeSwitch :variants="controllerExamples" />
+
+两段代码不同，是因为 `IMenuController`/`IModelController` 是 SmartWeb 的接口默认方法，而 Spring MVC 需要在 `@RestController` 中显式声明每条路由。路径、请求体和返回对象仍然遵循同一份 [交互规则](/protocol/http-api)。
+
+Spring 的完整模型控制器通常还要根据请求中的 `{model}` 将 JSON 转换成对应实体。只有固定单模型的接口才适合直接写 `@RequestBody Student`；通用控制器应使用 `AkoService.modelOf(model).type` 配合 Jackson `ObjectMapper` 做白名单转换，不要让客户端决定任意 Java 类。
 
 ## 认证控制器
 
-前端启动需要 `auth/isAuth`。如果要使用 Ako 自带登录页，还需要 `auth/login`：
+### Rain 与 Spring 的路由差异
+
+<CodeSwitch :variants="authExamples" />
+
+`currentSessionIsAuthenticated` 和 `authenticateAndCreateSession` 只是业务占位符。测试应用可以返回固定 `true` 跑通页面，但生产环境必须接入真实认证，并确保 `401`、`403` 和登录失败响应符合前端预期。
+
+## Spring Data 的最小绑定
+
+Spring Data 测试代码使用固定实体接收保存请求：
 
 ```kotlin
-package example.controller
+@PostMapping("/save/{model}")
+fun save(
+  @PathVariable model: String,
+  @RequestBody data: TestEntity,
+) = transaction {
+  Model.save(model, data)
+}
 
-import rain.controller.annotation.Path
-import smartweb.annotation.GetAction
-import smartweb.annotation.PostAction
-import smartweb.annotation.RequestBody
-import smartweb.annotation.WebController
-
-data class LoginRequest(
-    val username: String,
-    val password: String,
-)
-
-@Path("auth")
-@WebController
-class AuthController : AkoController() {
-
-    @GetAction("isAuth")
-    fun isAuth(): Boolean {
-        return currentSessionIsAuthenticated()
-    }
-
-    @PostAction("login")
-    fun login(@RequestBody request: LoginRequest) {
-        authenticateAndCreateSession(request.username, request.password)
-    }
+@PostMapping("/delete/{model}")
+fun delete(
+  @PathVariable model: String,
+  @RequestBody ids: List<String>,
+) = transaction {
+  Model.delete(model, ids)
 }
 ```
 
-`currentSessionIsAuthenticated` 和 `authenticateAndCreateSession` 是业务伪代码，需要替换为你的账号系统。当前仓库的测试控制器返回固定 `true`，只用于跑通页面，不应直接用于生产。
-
-## 请求体与参数
-
-- `page` 的请求体是 `ModelPageReq` 形状。
-- `save` 的请求体是模型 JSON；`ako-rain` 当前控制器会把 JSON 字符串解析成对应模型类型。
-- `delete` 的请求体是 ID 数组；适配器按实际主键类型转换。
-- `model` 和 `channel` 来自路径，必须校验，不要直接用于拼接查询。
-
-请求和响应的跨框架定义见 [交互规则](/protocol/http-api)。
+真实项目如果一个控制器负责多个模型，应使用统一的 JSON 到模型类型转换层；模型名、字段和主键类型都必须经过 Ako 模型注册表校验。
 
 ## 自定义业务接口
 
-自动生成页面只负责通用 CRUD。复杂操作可以写一个普通 SmartWeb 控制器，再通过 `ModelButton`、`OperateButton` 或前端固定页面调用它：
+自动生成页面只负责通用 CRUD。复杂操作可以通过模型按钮或前端固定页面调用一个普通业务控制器：
 
-```kotlin
-@Path("api/student/{studentId}")
-@WebController
-class StudentItemController {
+<CodeSwitch :variants="businessExamples" />
 
-    @PatchAction("point")
-    fun point(studentId: Int, point: Int, mode: Int) = transaction {
-        // 读取学生、校验权限、更新积分并提交事务
-    }
-}
-```
-
-按钮 URL 可以使用 `${id}` 等占位符，详见 [模型定义](/protocol/metadata) 中的按钮定义。业务接口仍然必须独立完成鉴权和参数校验。
+按钮 URL 可以使用 `${id}`、`${ids}` 等占位符。无论哪套框架，业务接口都必须独立完成鉴权、参数校验、事务和审计；按钮来自元数据不是放宽权限的理由。
 
 ## CORS 与部署
 
-开发时可以让 Vite proxy 转发 `/api`；生产环境优先使用同源部署。若前后端不同域：
+开发时可以让 Vite proxy 转发 `/api`；生产环境优先同源部署。若前后端不同域：
 
-- 配置 SmartWeb 或网关的 CORS。
+- Rain：在 SmartWeb 或网关配置 CORS。
+- Spring：在 Spring MVC/Security 或网关配置 CORS。
 - 明确 Cookie 的 `SameSite`、`Secure` 和凭据传递策略。
 - 只允许实际前端来源，不要使用宽泛的 `*` 搭配凭据。
-- 确认 `401` 能被前端识别并重新进入认证流程。
+- 确认未授权响应为 `401`，前端才能重新进入认证流程。
 
 ## 控制器检查清单
 
-- [ ] `AkoRain` 已注册并能发现模型 Access。
-- [ ] `menu` 和 `model` 路径与前端 `baseUrl` 拼接后完全一致。
+- [ ] 对应 Runtime 已初始化：`AkoRain` 或 `AkoSpringRuntime`。
+- [ ] 菜单和模型路由与前端 `baseUrl` 拼接后完全一致。
 - [ ] `auth/isAuth` 返回 JSON 布尔值。
-- [ ] 分页第一页按 `page: 1` 处理。
-- [ ] `information` 在关联字段存在时返回正确结构。
+- [ ] 分页第一页按 `page: 1` 解释。
+- [ ] 关联字段存在时，分页响应包含正确的 `information`。
 - [ ] `save`、`delete` 有服务端校验、授权和事务。
-- [ ] 错误状态码与 [交互规则](/protocol/http-api) 约定一致。
+- [ ] 错误状态码与 [交互规则](/protocol/http-api) 一致。

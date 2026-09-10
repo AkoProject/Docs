@@ -1,150 +1,179 @@
 ---
 title: 开始
-description: 使用 Rain、SmartWeb 和 SmartAccess 接入 Ako JVM 后端。
+description: 使用 ako-rain 或 ako-spring 启动 JVM 后端，并接通 Ako 管理后台接口。
 ---
 
 # 开始
 
-`ako-rain` 是当前 Ako JVM 方向已经接通的后端实现。它把 Ako 核心模型协议接入 Rain 应用生命周期、SmartWeb 控制器和 SmartAccess/JPA 数据访问。
+项目创建完成后，这一页负责把 JVM 后端真正启动起来。`ako-rain` 和 `ako-spring` 都要完成同一条 Ako 链路：注册 Runtime、发现模型、提供菜单/模型接口，再让前端打开页面。
 
-## 依赖
+本页的差异代码使用统一的框架选择器。它会沿用你在其他 JVM 页面中的选择，并保存到浏览器 `localStorage`。
 
-`ako-rain` 的构建文件把 Rain、SmartWeb 和 SmartAccess 作为平台依赖，因此业务应用需要显式引入一组相互匹配的版本。源码仍是开发版本，下面用占位符避免复制出过期坐标：
+## 依赖速查
 
 <script setup lang="ts">
-const rainDependencyExamples = [
+const dependencyExamples = [
   {
     language: 'Kotlin DSL',
     framework: 'ako-rain',
-    code: `repositories {
-  mavenCentral()
-  maven("https://maven.cnb.cool/IceCream/maven/-/packages/")
-}
-
-val akoVersion = "<ako-version>"
-val rainVersion = "<rain-version>"
-val smartWebVersion = "<smartweb-version>"
-val smartAccessVersion = "<smartaccess-version>"
-
-dependencies {
-  implementation("com.ako-dev:ako-rain:$akoVersion")
-  implementation("com.IceCreamQAQ.Rain:application:$rainVersion")
-  implementation("com.IceCreamQAQ.Rain:controller:$rainVersion")
-  implementation("com.IceCreamQAQ.SmartWeb.Server:SmartHTTP:$smartWebVersion")
-  implementation("com.IceCreamQAQ.SmartAccess:hibernate5:$smartAccessVersion")
-  runtimeOnly("com.h2database:h2:<h2-version>")
+    code: `dependencies {
+  implementation("com.ako-dev:ako-rain:<ako-version>")
+  implementation("com.IceCreamQAQ.Rain:application:<rain-version>")
+  implementation("com.IceCreamQAQ.Rain:controller:<rain-version>")
+  implementation("com.IceCreamQAQ.SmartWeb.Server:SmartHTTP:<smartweb-version>")
+  implementation("com.IceCreamQAQ.SmartAccess:hibernate5:<smartaccess-version>")
 }`,
-    note: '版本请以 JVM 根项目和 framework/rain/build.gradle.kts 的组合为准。不要把开发版本直接升级成互不匹配的一组。',
+    note: 'Rain 依赖 SmartWeb 和 SmartAccess；完整仓库配置与版本说明见项目创建。',
   },
   {
-    language: 'HTTP',
-    framework: '自定义后端',
-    code: `只要提供同一组接口即可：
+    language: 'Kotlin DSL',
+    framework: 'ako-spring',
+    code: `dependencies {
+  implementation("com.ako-dev:ako-springboot-3:<ako-version>")
+  implementation("com.ako-dev:ako-springboot-springdata:<ako-version>")
+  implementation("org.springframework.boot:spring-boot-starter-web")
+  implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+}`,
+    note: '这是 Boot 3 示例；Boot 4 把 ako-springboot-3 换成 ako-springboot-4。Boot 2 见项目创建的兼容说明。',
+  },
+]
 
-GET  /api/ako/menu/list/{channel}
-POST /api/ako/model/page/{model}
-POST /api/ako/model/save/{model}
-POST /api/ako/model/delete/{model}
+const launcherExamples = [
+  {
+    language: 'Kotlin',
+    framework: 'ako-rain',
+    code: `import rain.application.FullStackApplicationLauncher
 
-认证入口：
-GET  /api/ako/auth/isAuth
-POST /api/ako/auth/login`,
-    note: '这个分支不是 Spring 已实现的代码，只是说明协议可以独立于 Rain。',
+fun main() {
+  FullStackApplicationLauncher.launch()
+}`,
+    note: 'Rain 完整启动器负责模块初始化；ako-rain 通过 Rain 模块配置注册 AkoRain。',
+  },
+  {
+    language: 'Kotlin',
+    framework: 'ako-spring',
+    code: `import org.springframework.boot.autoconfigure.SpringBootApplication
+import org.springframework.boot.runApplication
+
+@SpringBootApplication
+class Application
+
+fun main(args: Array<String>) {
+  runApplication<Application>(*args)
+}`,
+    note: 'Spring Boot 自动配置负责创建 AkoSpringRuntime；不要手工再 new 一个 Runtime。',
+  },
+]
+
+const configurationExamples = [
+  {
+    language: 'Properties',
+    framework: 'ako-rain',
+    code: `# src/main/resources/conf/application.properties
+rain.scanPackages=example
+webServer.port=17777
+
+db.provider=smartaccess.hibernate.HibernateService
+db.driver=org.h2.Driver
+db.url=jdbc:h2:./h2db/ako
+db.username=h2
+db.password=h2
+db.dialect=org.hibernate.dialect.H2Dialect`,
+    note: 'Rain 的扫描、Web 和 SmartAccess 配置由 Rain 生态解释；ako-rain 的模块配置会注册 AkoRain。',
+  },
+  {
+    language: 'YAML',
+    framework: 'ako-spring',
+    code: `# src/main/resources/application.yml
+server:
+  port: 17777
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:ako;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: update`,
+    note: 'Spring Boot 由 application.yml 创建数据源、JPA 和 Web 环境；Spring 自动配置会注册 AkoSpringRuntime 与 Spring Data 数据库实现。',
   },
 ]
 </script>
 
-<CodeSwitch :variants="rainDependencyExamples" />
+<CodeSwitch :variants="dependencyExamples" />
 
-当前源码快照的参考值是：Ako 根项目版本 `0.0.14`；`framework/rain` 构建文件中使用的 Rain、SmartWeb、SmartAccess 仍是开发版本。发布和运行前请核对制品仓库中真正存在的版本。
+## 启动应用
 
-## 创建入口
+<CodeSwitch :variants="launcherExamples" />
 
-Rain 应用使用完整启动器：
+两段启动代码不能互换：Rain 使用自己的 ApplicationService/ClassRegister 生命周期，Spring 使用 ApplicationContext 和自动配置。两者最终都会初始化 Ako Runtime，但初始化入口不同。
 
-```kotlin
-package example
+## 配置宿主框架
 
-import rain.application.FullStackApplicationLauncher
+<CodeSwitch :variants="configurationExamples" />
 
-fun main() {
-    FullStackApplicationLauncher.launch()
-}
-```
+Rain 使用 `rain.scanPackages` 和 SmartAccess 的配置键；Spring 使用组件扫描、`spring.datasource`、`spring.jpa` 和可选的 `@EnableJpaRepositories`。差异来自宿主框架配置模型，不是 Ako 协议差异。
 
-`FullStackApplicationLauncher` 会创建支持 Rain 类增强的应用类加载器；如果不需要类增强，可以按 Rain 文档选择基础启动器。
+## 模型发现
 
-## 配置扫描与数据库
+| 检查项 | `ako-rain` | `ako-spring` |
+| --- | --- | --- |
+| Runtime | `AkoRain` | `AkoSpringRuntime` |
+| 模型来源 | Rain 发现的 `AkoAccess` 接口 | Spring 容器中的 `AkoSpringDatabase`；Spring Data 时来自 Repository Bean |
+| 排除模型 | `@NoAkoModel` | `@NoAkoModel`，在 Runtime 建立模型表时过滤 |
+| 模型初始化 | 访问 `modelMap` 时按 Access 延迟创建 | `ContextRefreshedEvent` 后或首次访问 `modelMap` 时创建 |
+| 失败重点 | 包未扫描、Access 未注册、SmartAccess 不可用 | Repository 未扫描、数据库 Bean 缺失、事务管理器/JPA 未配置 |
 
-Ako 模型和 Access 必须在 Rain 扫描范围内。可以在 `src/main/resources/conf/application.properties` 中写入：
+两边都使用 `model.id` 作为前端模型标识，并把同一组 `DbModel`/`DbField` 返回给前端。
 
-```properties
-rain.scanPackages=example
-```
+## 挂载 Ako 路由
 
-`ako-rain` 自身的模块配置会注册 `ako.rain.AkoRain`，不要移除它。使用 H2 验证链路时，可以配置：
-
-```yaml
-webServer:
-  port: 17777
-
-db:
-  provider: smartaccess.hibernate.HibernateService
-  driver: org.h2.Driver
-  url: jdbc:h2:./h2db/ako
-  username: h2
-  password: h2
-  dialect: org.hibernate.dialect.H2Dialect
-```
-
-生产环境请根据 SmartAccess 文档配置实际数据库、连接池和 Hibernate 参数。Rain 的配置文件格式、扫描边界和启动顺序见 [Rain 快速开始](https://rain.icecreamqaq.com/guide/getting-started) 与 [SmartAccess 配置](https://rain.icecreamqaq.com/smartaccess/configuration)。
-
-## 最小项目结构
+两种实现都要提供：
 
 ```text
-src/main/kotlin/example/
-├── Application.kt
-├── controller/
-│   ├── AkoController.kt
-│   ├── MenuController.kt
-│   ├── ModelController.kt
-│   └── AuthController.kt
-└── model/
-    ├── Student.kt
-    └── Group.kt
-src/main/resources/conf/
-└── application.properties
+GET  /api/ako/auth/isAuth
+POST /api/ako/auth/login
+GET  /api/ako/menu/list/{channel}
+POST /api/ako/model/page/{model}
+POST /api/ako/model/save/{model}
+POST /api/ako/model/delete/{model}
 ```
 
-模型声明见 [实体模型](/backend/rain/models)，控制器挂载见 [控制器与接口](/backend/rain/controllers)。
-
-## 事务与软删除
-
-`ako-rain` 的标准模型接口会在分页、保存和删除操作外围开启事务。JPA 方向的 `CompleteModel` 设计上继承软删除模型；配套的 `SoftDeleteAccess` 尝试把删除操作重写为更新删除时间，而不是直接物理删除。
-
-当前开发快照的 QueryRewriter 仍需要验证，详见 [数据访问与事务](/backend/rain/data-access) 的软删除说明。
-
-这只是当前 JVM + JPA 实现的默认行为。其他适配器可以使用自己的事务和删除策略，但应在数据与安全文档中明确说明。
+具体的控制器代码见 [控制器与接口](/backend/rain/controllers)。Rain 可以直接实现 `IMenuController`/`IModelController`；Spring 当前使用普通 `@RestController` 调用 Ako 核心的 `Menu` 和 `Model` 服务。这是 Web 框架路由机制不同造成的差异。
 
 ## 运行检查
 
-启动后检查：
+启动后，按顺序检查：
 
 ```bash
+curl http://localhost:17777/api/ako/auth/isAuth
 curl http://localhost:17777/api/ako/menu/list/manager
 curl -X POST http://localhost:17777/api/ako/model/page/Student \
   -H 'Content-Type: application/json' \
   -d '{"page":1,"size":20,"params":{},"sort":{}}'
 ```
 
-如果 `models` 为空，优先检查 Access 是否继承 `AkoAccess`/`SoftDeleteAccess`、模型包是否在 `rain.scanPackages` 内，以及 `AkoRain` 是否已经注册。
+如果 `models` 为空：
 
-完整的真实页面示例见 [Ako 快速开始的运行效果](/guide/quick-start#_5-真实运行效果)。
+- Rain：检查 `rain.scanPackages`、Access 是否被 ClassRegister 发现，以及 SmartAccess/JPA 服务。
+- Spring：检查 `@SpringBootApplication` 的扫描范围、Repository 是否被 `@EnableJpaRepositories` 扫描，以及 `AkoSpringDatabase` 是否成为 Bean。
+
+如果菜单已有模型但分页失败，先对照 [交互规则](/protocol/http-api) 检查请求体，再检查对应数据访问层的字段白名单、类型转换和事务。
+
+## 事务与软删除
+
+两种实现都支持 `CompleteModel` 的模型生命周期，但底层策略不同：
+
+- Rain 使用 `AkoRain.instance.transaction`，并尝试启用 Hibernate `_ako_soft_delete` Filter；`SoftDeleteAccess` 通过 QueryRewriter 处理删除。
+- Spring 使用 `AkoSpringRuntime.transaction` 和 Spring `PlatformTransactionManager`；Spring Data 数据库实现对 `SoftDeleteModel` 显式更新 `deleteTime`，并在 Criteria 查询中排除已删除数据。
+
+详细对照见 [数据访问与事务](/backend/rain/data-access)。不要因为两边方法名相同，就假设软删除、事务传播或异常回滚行为完全相同。
 
 ## 进一步使用
 
-主流程跑通后，再按需要阅读：
-
-- [数据访问与事务](/backend/rain/data-access)：查询、保存、删除、事务、软删除和模型基类。
-- [控制器与接口](/backend/rain/controllers)：认证、Ako 路由和自定义业务接口。
-- [内置工具](/backend/rain/tools)：`AkoRain`、Access 查找、元数据和错误工具。
+- [项目创建](/backend/rain/project)：依赖、Boot 版本和配置文件。
+- [实体模型](/backend/rain/models)：两种框架下的 Entity、Access/Repository 和字段声明。
+- [注解功能](/backend/rain/annotations)：与框架无关的 Ako 注解及其前端效果。
+- [前端联动](/backend/rain/frontend)：从元数据到页面的完整链路。
