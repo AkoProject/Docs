@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Ako">
+  <defs>
+    <linearGradient id="ako-gradient" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2e95ff"/>
+      <stop offset="1" stop-color="#8f7cff"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="#12233f"/>
+  <path d="M15 45 28.5 17h7L49 45h-7l-3.2-7.2H25.2L22 45h-7Zm12.7-13.1h8.2l-4.1-9.3-4.1 9.3Z" fill="url(#ako-gradient)"/>
+</svg>
