@@ -122,7 +122,8 @@ export default defineConfig({
     outline: { level: [2, 3] },
     search: { provider: 'local' },
     footer: {
-      message: 'Ako 前后端分离，协议先于框架。',
+      message:
+        'Ako 前后端分离，协议先于框架。<br><a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer">渝ICP备2025058994号-4</a>',
       copyright: 'Copyright © Ako contributors',
     },
     socialLinks: [
