@@ -9,7 +9,7 @@ master:
         - bun run docs:build
         - name: deploy
           image: tencentcom/deploy-eopages:latest
-          script: edgeone pages deploy ./docs/.vitepress/dist -n ako-doc -t $EO_KEY
+          script: edgeone pages deploy ./.vitepress/dist -n ako-doc -t $EO_KEY
 
 $:
   vscode:
