@@ -22,7 +22,7 @@ Ako 前端只关心固定的 HTTP 路径和 JSON 形状；Rain 与 Spring 的控
 
 ## 菜单与模型控制器
 
-### Rain：实现 Ako 控制器接口
+### Rain 与 Spring：菜单与模型路由
 
 <script setup lang="ts">
 const controllerExamples = [
@@ -50,27 +50,54 @@ class ModelController : AkoController(), IModelController`,
   {
     language: 'Kotlin',
     framework: 'ako-spring',
-    code: `import ako.controller.Menu
+    code: `import ako.AkoService
+import ako.controller.Menu
 import ako.controller.Model
 import ako.model.req.ModelPageReq
 import ako.spring.\`fun\`.transaction
-import org.springframework.web.bind.annotation.*
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RestController
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.ObjectMapper
 
 @RestController
 @RequestMapping("/api/ako/menu")
-class AkoMenuController {
+open class AkoMenuController {
   @GetMapping("/list/{channel}")
   fun list(@PathVariable channel: String) = Menu.list(channel)
 }
 
 @RestController
 @RequestMapping("/api/ako/model")
-class AkoModelController {
+open class AkoModelController(
+  private val objectMapper: ObjectMapper,
+) {
   @PostMapping("/page/{model}")
-  fun page(@PathVariable model: String, @RequestBody data: ModelPageReq) =
-    transaction { Model.page(model, data) }
+  fun page(
+    @PathVariable model: String,
+    @RequestBody data: ModelPageReq,
+  ) = transaction { Model.page(model, data) }
+
+  @PostMapping("/save/{model}")
+  fun save(
+    @PathVariable model: String,
+    @RequestBody data: JsonNode,
+  ) = transaction {
+    val mc = AkoService.modelOf(model)
+    Model.save(model, objectMapper.treeToValue(data, mc.type))
+  }
+
+  @PostMapping("/delete/{model}")
+  fun delete(
+    @PathVariable model: String,
+    @RequestBody ids: List<String>,
+  ) = transaction { Model.delete(model, ids) }
 }`,
-    note: 'ako-spring 当前不提供 Rain 风格的控制器接口；用 Spring MVC 注解注册路由，并调用 Ako 核心服务。save/delete 以你的 JSON 绑定策略补上。',
+    note: '这是 ako-springboot-springdata 测试中验证过的写法：Spring MVC 负责路由和 JSON 绑定，AkoService.modelOf 校验模型并取得实体类型，ObjectMapper 再把通用 JSON 转成实体。',
   },
 ]
 
@@ -147,7 +174,9 @@ class StudentItemController {
 
 两段代码不同，是因为 `IMenuController`/`IModelController` 是 SmartWeb 的接口默认方法，而 Spring MVC 需要在 `@RestController` 中显式声明每条路由。路径、请求体和返回对象仍然遵循同一份 [交互规则](/protocol/http-api)。
 
-Spring 的完整模型控制器通常还要根据请求中的 `{model}` 将 JSON 转换成对应实体。只有固定单模型的接口才适合直接写 `@RequestBody Student`；通用控制器应使用 `AkoService.modelOf(model).type` 配合 Jackson `ObjectMapper` 做白名单转换，不要让客户端决定任意 Java 类。
+Spring 的 `{model}` 是通用模型控制器的关键。`page` 使用固定的 `ModelPageReq`，`delete` 使用 `List<String>` 接收前端传来的 ID 列表；`save` 则先通过 `AkoService.modelOf(model)` 从已注册模型中取得类型，再用注入的 `ObjectMapper` 转换 `JsonNode`。这样模型名和实体类型都来自服务端注册表，不要让客户端提交 Java 类名后直接反射加载。
+
+上面的 Spring Data 示例默认按当前测试配置使用 Spring Boot 4，因此导入的是 Jackson 3 的 `tools.jackson.databind.JsonNode` 和 `tools.jackson.databind.ObjectMapper`。如果项目使用 Spring Boot 3，把这两个导入改为 `com.fasterxml.jackson.databind.JsonNode` 和 `com.fasterxml.jackson.databind.ObjectMapper`；控制器路由、`treeToValue` 调用和 Ako 协议不变。
 
 ## 认证控制器
 
@@ -157,29 +186,66 @@ Spring 的完整模型控制器通常还要根据请求中的 `{model}` 将 JSON
 
 `currentSessionIsAuthenticated` 和 `authenticateAndCreateSession` 只是业务占位符。测试应用可以返回固定 `true` 跑通页面，但生产环境必须接入真实认证，并确保 `401`、`403` 和登录失败响应符合前端预期。
 
-## Spring Data 的最小绑定
+## Spring Data JPA 的装配与绑定
 
-Spring Data 测试代码使用固定实体接收保存请求：
+`ako-springboot-springdata` 会从 Spring `ApplicationContext` 中发现 `JpaRepository` Bean，并根据 Repository 的泛型参数确定它负责的 Ako 模型。控制器可以使用下面的基础接口；测试项目还显式声明了 Repository 扫描范围：
 
 ```kotlin
-@PostMapping("/save/{model}")
-fun save(
-  @PathVariable model: String,
-  @RequestBody data: TestEntity,
-) = transaction {
-  Model.save(model, data)
-}
+import ako.spring.data.AkoJpaRepository
+import org.springframework.boot.autoconfigure.SpringBootApplication
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories
 
-@PostMapping("/delete/{model}")
-fun delete(
-  @PathVariable model: String,
-  @RequestBody ids: List<String>,
-) = transaction {
-  Model.delete(model, ids)
+@SpringBootApplication
+@EnableJpaRepositories(basePackageClasses = [TestEntityRepository::class])
+open class AkoSpringDataApplication
+
+interface TestEntityRepository : AkoJpaRepository<TestEntity, Int>
+```
+
+如果 Repository 位于 `@SpringBootApplication` 的组件扫描范围内，可以按项目结构省略显式的 `@EnableJpaRepositories`；跨包或多模块项目建议像测试一样指定 `basePackageClasses`，确保 Repository 成为 Spring Bean。`AkoSpringDataDatabase` 只有在拿到这些 Bean 后，才能把模型放入 `AkoSpringRuntime.modelMap`。
+
+测试中的模型与伴生对象写法如下：
+
+```kotlin
+import ako.model.base.CompleteModel
+import ako.spring.`fun`.findAccess
+import jakarta.persistence.Column
+import jakarta.persistence.Entity
+import jakarta.persistence.Table
+
+@Entity
+@Table(name = "ako_spring_test_entity")
+open class TestEntity : CompleteModel() {
+  @Column(nullable = false)
+  open var name: String = ""
+
+  companion object : TestEntityRepository by findAccess()
 }
 ```
 
-真实项目如果一个控制器负责多个模型，应使用统一的 JSON 到模型类型转换层；模型名、字段和主键类型都必须经过 Ako 模型注册表校验。
+`findAccess()` 返回的是延迟解析的 Spring Access 代理；真正调用 Repository 时才从 ApplicationContext 取得 Bean。Kotlin 项目应使用 `kotlin-spring`/`all-open` 插件，或者像测试代码一样将 Spring 管理的类和可代理属性声明为 `open`。
+
+### 用 HTTP 验证控制器
+
+Spring Data 测试使用随机端口直接请求这些接口，并验证它们保持 Rain 适配器使用的同一份 HTTP 合约：
+
+```bash
+curl http://localhost:<port>/api/ako/menu/list/default
+
+curl -X POST http://localhost:<port>/api/ako/model/page/TestEntity \
+  -H 'Content-Type: application/json' \
+  -d '{"page":1,"size":20,"params":{"name_like":"A%"},"sort":{"id":"ASC"}}'
+
+curl -X POST http://localhost:<port>/api/ako/model/save/TestEntity \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Bob"}'
+
+curl -X POST http://localhost:<port>/api/ako/model/delete/TestEntity \
+  -H 'Content-Type: application/json' \
+  -d '["1"]'
+```
+
+测试验证了菜单返回 `TestEntity`、分页能按 `name_like` 查询、保存能从通用 JSON 创建实体，以及删除后分页总数和剩余数据正确。实际项目还应在这些控制器中补上认证、授权、字段白名单、审计和统一异常处理。
 
 ## 自定义业务接口
 
