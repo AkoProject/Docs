@@ -12,6 +12,9 @@ hero:
     - theme: alt
       text: 后端（JVM）
       link: /backend/rain/project
+    - theme: alt
+      text: 后端（JavaScript）
+      link: /backend/javascript/project
 
 features:
   - title: 一份模型声明
@@ -25,6 +28,6 @@ features:
 <div class="ako-home-note">
 
 <span class="ako-home-note__status">当前实现</span>
-<p>Ako 当前已经打通 Vue 3 前端与 JVM 后端的 <code>ako-rain</code> 和 <code>ako-spring</code> 实现。协议层保持独立，其他语言和框架也可以沿着同一份 HTTP 合约接入。</p>
+<p>Ako 当前已经打通 Vue 3 前端与 JVM 后端的 <code>ako-rain</code>、<code>ako-spring</code>，并提供 Node.js/Bun 上的 TypeScript JavaScript 后端实验实现。协议层保持独立，其他语言和框架也可以沿着同一份 HTTP 合约接入。</p>
 
 </div>

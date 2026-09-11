@@ -69,10 +69,11 @@ GET /menu/list/{channel}
 
 ## 当前实现
 
-当前文档以两个源码仓库为依据：
+当前文档以以下源码仓库和协议文档为依据：
 
 - 前端：[`AkoProject/Frontend`](https://github.com/AkoProject/Frontend)，Vue 3 + Element Plus，包名为 `@ako-dev/ako`。
 - JVM：[`AkoProject/JVM`](https://github.com/AkoProject/JVM)，包含协议核心、JPA 基础模型、`ako-rain` 和 `ako-spring` 框架适配。
+- JavaScript：[`AkoProject/JavaScript`](https://github.com/AkoProject/JavaScript)，使用 TypeScript、Yarn，并通过 Node/Bun 与 ORM/Web 框架适配器接入 Ako 协议。
 - Rain：[`Rain JVM 文档`](https://rain.icecreamqaq.com/)，负责 `ako-rain` 所依赖的应用生命周期、控制器、SmartWeb 与 SmartAccess 生态。
 - Spring：[`Spring Boot 文档`](https://docs.spring.io/spring-boot/docs/current/reference/html/)，`ako-spring` 已提供 Boot 2/3/4 自动配置和 Spring Data JPA 适配；具体模块组合见 [后端（JVM）项目创建](/backend/rain/project)。
 
@@ -81,4 +82,5 @@ GET /menu/list/{channel}
 - 想快速看到完整链路：阅读 [快速开始](/guide/quick-start)。
 - 想实现自己的后端：先读 [Ako 协议](/protocol/overview)，再看 [后端实现概览](/backend/overview)。
 - 已经使用 Rain 或 Spring Boot：直接进入 [后端（JVM）项目创建](/backend/rain/project)。
+- 想用 Node.js 或 Bun 实现后端：进入 [后端（JavaScript）](/backend/javascript/)。
 - 想改造页面：阅读 [前端配置](/frontend/configuration)、[mixin 使用方法](/frontend/mixins) 与 [使用 Ako View 构建页面](/frontend/views)。

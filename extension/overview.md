@@ -5,13 +5,14 @@ description: Ako 协议、后端适配器和前端扩展能力的入口。
 
 # 扩展参考
 
-Ako 的日常使用从 [前端开始方式](/frontend/quick-start) 和 [后端（JVM）项目创建](/backend/rain/project) 开始。只有在需要接入其他后端、替换前端渲染器或设计新字段类型时，才需要阅读本组扩展内容。
+Ako 的日常使用从 [前端开始方式](/frontend/quick-start)、[后端（JVM）项目创建](/backend/rain/project) 或 [后端（JavaScript）项目创建](/backend/javascript/project) 开始。只有在需要接入其他后端、替换前端渲染器或设计新字段类型时，才需要阅读本组扩展内容。
 
 ## 三种扩展方向
 
 | 需求 | 从哪里开始 |
 | --- | --- |
 | 用自己的语言或 Web 框架提供 Ako 后端 | [交互规则](/protocol/http-api) → [模型定义](/protocol/metadata) |
+| 使用 Node.js/Bun 与 TypeScript 提供 Ako 后端 | [后端（JavaScript）](/backend/javascript/) |
 | 增加枚举、关联或自定义字段类型 | [模型定义](/protocol/metadata) → [前端自定义页面与类型](/frontend/customization) |
 | 让 Rain 之外的 JVM/ORM 接入 Ako | [后端适配器](/backend/overview) |
 | 自定义按钮和业务操作 | [模型定义](/protocol/metadata) 中的按钮定义 |

@@ -10,6 +10,7 @@ export default defineConfig({
     nav: [
       { text: '前端', link: '/frontend/quick-start' },
       { text: '后端（JVM）', link: '/backend/rain/project' },
+      { text: '后端（JavaScript）', link: '/backend/javascript/project' },
       { text: '扩展参考', link: '/extension/overview' },
     ],
     sidebar: {
@@ -51,6 +52,28 @@ export default defineConfig({
             { text: '实体模型', link: '/backend/rain/models' },
             { text: '注解功能', link: '/backend/rain/annotations' },
             { text: '前端联动', link: '/backend/rain/frontend' },
+          ],
+        },
+      ],
+      '/backend/javascript/': [
+        {
+          text: '后端（JavaScript）',
+          link: '/backend/javascript/',
+          items: [
+            { text: 'Monorepo 与 package', link: '/backend/javascript/monorepo' },
+            { text: '项目创建与启动', link: '/backend/javascript/project' },
+            { text: '模型与元数据', link: '/backend/javascript/models' },
+            { text: 'Repository 与数据访问', link: '/backend/javascript/data-access' },
+            { text: '适配器总览', link: '/backend/javascript/adapters' },
+            { text: 'Express 接入', link: '/backend/javascript/express' },
+            { text: 'Fastify 接入', link: '/backend/javascript/fastify' },
+            { text: 'Hono 接入', link: '/backend/javascript/hono' },
+            { text: 'Koa 接入', link: '/backend/javascript/koa' },
+            { text: 'Prisma 接入', link: '/backend/javascript/prisma' },
+            { text: 'Drizzle 接入', link: '/backend/javascript/drizzle' },
+            { text: 'TypeORM 接入', link: '/backend/javascript/typeorm' },
+            { text: 'Sequelize 接入', link: '/backend/javascript/sequelize' },
+            { text: 'Web 框架、鉴权与安全', link: '/backend/javascript/controllers' },
           ],
         },
       ],

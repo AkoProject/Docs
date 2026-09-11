@@ -5,7 +5,7 @@ description: Ako 后端适配器的分层方式，以及如何接入任意语言
 
 # 后端实现概览
 
-Ako 后端不是一个固定的 Controller + ORM 模板，而是一层协议适配。当前仓库提供 JVM 核心、`ako-rain` 和 `ako-spring` 实现；协议设计允许其他语言和框架提供同样的 HTTP 响应。
+Ako 后端不是一个固定的 Controller + ORM 模板，而是一层协议适配。当前 Ako 实现包括 JVM 核心、`ako-rain`、`ako-spring` 和独立的 JavaScript/TypeScript 实验仓库；协议设计允许其他语言和框架提供同样的 HTTP 响应。
 
 ## 推荐分层
 
@@ -50,9 +50,15 @@ ID 列表 ──> 权限 + 主键转换 + 事务 ──> delete
 
 当前实现由公共 Runtime、Boot 2/3/4 自动配置和可选的 Spring Data JPA 数据库模块组成。Boot 3/4 可使用 `ako-springboot-springdata`；Boot 2 由于 `javax.persistence` 与 `ako-jpa` 的 Jakarta API 不同，应使用公共 SPI 自定义 `AkoSpringDatabase`。
 
+### JavaScript
+
+[`AkoProject/JavaScript`](https://github.com/AkoProject/JavaScript) 是一个 Node.js/Bun 上的 TypeScript 协议适配器实验。它使用显式 schema 生成 `DbModel`/`DbField`，用 `AkoRepository` 抽象 Prisma、Drizzle、TypeORM、SQL 或远程数据服务，并将 Node `http` 与 Bun `serve` 放在独立适配器中。它不内置 ORM、session 或事务实现。
+
+从 [后端（JavaScript）](/backend/javascript/) 开始，按 [Monorepo 与 package](/backend/javascript/monorepo) → [项目创建与启动](/backend/javascript/project) → [模型与元数据](/backend/javascript/models) → [Repository 与数据访问](/backend/javascript/data-access) → [适配器总览](/backend/javascript/adapters) 阅读。
+
 ## 实现其他语言/框架
 
-不需要实现 JVM 的 `Class`、注解或 `AkoAccess`。可以采用：
+不需要实现 JVM 的 `Class`、注解或 `AkoAccess`。JavaScript 实现已经采用显式 schema + repository adapter；其他语言也可以采用：
 
 - 显式 schema 文件生成元数据。
 - 结构体/类上的装饰器或注解生成元数据。

@@ -17,7 +17,8 @@ Ako 仍处于持续开发阶段。本文档把“已经能运行”“协议可�
 | JVM + JPA | 已实现 | 提供 JPA 基础模型、查询与软删除能力。 |
 | `ako-rain` | JVM 实现 | 已接入 Rain、SmartWeb 与 SmartAccess。 |
 | `ako-spring` | JVM 实现 | 已接入 Spring Boot 2/3/4 自动配置；Boot 3/4 可使用 Spring Data JPA 适配器，Boot 2 需自定义数据库实现。 |
-| 其他语言/框架 | 协议层可实现 | 暂无本仓库提供的官方适配器，需要自行实现 HTTP、元数据和数据访问。 |
+| JavaScript 后端 | 实验实现 | [`AkoProject/JavaScript`](https://github.com/AkoProject/JavaScript) 已提供 TypeScript 核心、Node/Bun handler、显式 schema、repository adapter 和内存实现；ORM、事务与认证由宿主应用负责。 |
+| 其他语言/框架 | 协议层可实现 | 暂无对应的官方适配器，需要自行实现 HTTP、元数据和数据访问。 |
 
 ## 推荐阅读顺序
 
@@ -43,6 +44,8 @@ Ako 仍处于持续开发阶段。本文档把“已经能运行”“协议可�
 3. [模型定义](/protocol/metadata)
 4. [字段类型与选项](/protocol/types)
 5. [按钮与操作](/protocol/buttons)
+
+如果目标运行时是 Node.js 或 Bun，可以直接阅读 [后端（JavaScript）](/backend/javascript/)；它把上述协议步骤包装成可复用的 TypeScript runtime。
 
 ## 当前限制与容易踩坑的地方
 
