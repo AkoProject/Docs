@@ -2,3 +2,4 @@
 /repos
 .vitepress/dist
 .vitepress/cache
+.idea/
