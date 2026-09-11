@@ -48,6 +48,54 @@ class ModelController : AkoController(), IModelController`,
     note: 'IMenuController 和 IModelController 已经把 SmartWeb 路由、Model.page/save/delete 和 Rain 事务接起来。',
   },
   {
+    language: 'Java',
+    framework: 'ako-rain',
+    code: `import ako.rain.controller.IMenuController;
+import ako.rain.controller.IModelController;
+import java.util.List;
+import java.util.Map;
+import rain.controller.annotation.Path;
+import smartweb.annotation.GetAction;
+import smartweb.annotation.PostAction;
+import smartweb.annotation.WebController;
+
+@Path("api/ako")
+public class AkoController {}
+
+@Path("menu")
+@WebController
+public class MenuController extends AkoController implements IMenuController {
+  @Override
+  @GetAction("list/{channel}")
+  public Map<String, Object> list(String channel) {
+    return IMenuController.super.list(channel);
+  }
+}
+
+@Path("model")
+@WebController
+public class ModelController extends AkoController implements IModelController {
+  @Override
+  @PostAction("page/{model}")
+  public ModelPageResp page(ModelPageReq data, String model) {
+    return IModelController.super.page(data, model);
+  }
+
+  @Override
+  @PostAction("save/{model}")
+  public void save(String model, String data) {
+    IModelController.super.save(model, data);
+  }
+
+  @Override
+  @PostAction("delete/{model}")
+  public void delete(String model, List<String> ids) {
+    IModelController.super.delete(model, ids);
+  }
+}`,
+    note: 'Java 实现接口默认方法时需要显式 override，并通过 IMenuController.super/IModelController.super 委托 Ako 的默认实现。',
+  },
+  {
     language: 'Kotlin',
     framework: 'ako-spring',
     code: `import ako.AkoService
@@ -99,6 +147,72 @@ open class AkoModelController(
 }`,
     note: '这是 ako-springboot-springdata 测试中验证过的写法：Spring MVC 负责路由和 JSON 绑定，AkoService.modelOf 校验模型并取得实体类型，ObjectMapper 再把通用 JSON 转成实体。',
   },
+  {
+    language: 'Java',
+    framework: 'ako-spring',
+    code: `import ako.AkoService;
+import ako.controller.Menu;
+import ako.controller.Model;
+import ako.model.base.AkoModel;
+import ako.model.base.ModelContext;
+import ako.model.req.ModelPageReq;
+import ako.model.resp.ModelPageResp;
+import java.util.List;
+import java.util.Map;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+
+@RestController
+@RequestMapping("/api/ako/menu")
+public class AkoMenuController {
+  @GetMapping("/list/{channel}")
+  public Map<String, Object> list(@PathVariable String channel) {
+    return Menu.INSTANCE.list(channel);
+  }
+}
+
+@RestController
+@RequestMapping("/api/ako/model")
+@Transactional
+public class AkoModelController {
+  private final ObjectMapper objectMapper;
+
+  public AkoModelController(ObjectMapper objectMapper) {
+    this.objectMapper = objectMapper;
+  }
+
+  @PostMapping("/page/{model}")
+  public ModelPageResp page(
+      @PathVariable String model,
+      @RequestBody ModelPageReq data) {
+    return Model.INSTANCE.page(model, data);
+  }
+
+  @PostMapping("/save/{model}")
+  public void save(
+      @PathVariable String model,
+      @RequestBody JsonNode data) throws Exception {
+    ModelContext<?> context = AkoService.INSTANCE.modelOf(model);
+    AkoModel entity = (AkoModel) objectMapper.treeToValue(data, context.getType());
+    Model.INSTANCE.save(model, entity);
+  }
+
+  @PostMapping("/delete/{model}")
+  public void delete(
+      @PathVariable String model,
+      @RequestBody List<String> ids) {
+    Model.INSTANCE.delete(model, ids);
+  }
+}`,
+    note: 'Java 直接调用 Kotlin object 的 INSTANCE；事务使用 Spring 的 @Transactional，通用保存仍通过 AkoService.INSTANCE.modelOf 做类型白名单转换。',
+  },
 ]
 
 const authExamples = [
@@ -119,6 +233,25 @@ class AuthController : AkoController() {
     note: 'GetAction/PostAction 来自 SmartWeb；认证函数是业务代码，需要接入真实用户系统。',
   },
   {
+    language: 'Java',
+    framework: 'ako-rain',
+    code: `import rain.controller.annotation.Path;
+import smartweb.annotation.GetAction;
+import smartweb.annotation.WebController;
+
+@Path("auth")
+@WebController
+public class AuthController extends AkoController {
+  @GetAction("isAuth")
+  public boolean isAuth() {
+    return currentSessionIsAuthenticated();
+  }
+
+  // 按同样方式添加 @PostAction("login")。登录实现属于业务系统。
+}`,
+    note: 'Java 使用 SmartWeb 的 GetAction/PostAction；Rain DI、Session 和实际认证服务按应用配置接入。',
+  },
+  {
     language: 'Kotlin',
     framework: 'ako-spring',
     code: `@RestController
@@ -133,6 +266,30 @@ class AuthController {
   }
 }`,
     note: 'GetMapping/PostMapping 来自 Spring MVC；可以接入 Spring Security、Session 或自定义 Token。',
+  },
+  {
+    language: 'Java',
+    framework: 'ako-spring',
+    code: `import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/ako/auth")
+public class AuthController {
+  @GetMapping("/isAuth")
+  public boolean isAuth() {
+    return currentSessionIsAuthenticated();
+  }
+
+  @PostMapping("/login")
+  public void login(@RequestBody LoginRequest request) {
+    authenticateAndCreateSession(request.username(), request.password());
+  }
+}`,
+    note: 'Java 使用 Spring MVC 的 GetMapping/PostMapping；可以接入 Spring Security、Session 或自定义 Token。',
   },
 ]
 
@@ -151,6 +308,23 @@ class StudentItemController {
     note: 'SmartWeb 的路径参数和动作注解由 Rain 绑定。',
   },
   {
+    language: 'Java',
+    framework: 'ako-rain',
+    code: `import rain.controller.annotation.Path;
+import smartweb.annotation.PatchAction;
+import smartweb.annotation.WebController;
+
+@Path("api/student/{studentId}")
+@WebController
+public class StudentItemController {
+  @PatchAction("point")
+  public void point(int studentId, int point, int mode) {
+    // 通过 Rain DI 获取 Access，读取学生、校验权限、更新积分并提交事务。
+  }
+}`,
+    note: 'Java 使用 SmartWeb 的 PatchAction；路径参数绑定和事务由 Rain 适配器负责。',
+  },
+  {
     language: 'Kotlin',
     framework: 'ako-spring',
     code: `@RestController
@@ -166,6 +340,103 @@ class StudentItemController {
   }
 }`,
     note: 'Spring MVC 使用 PatchMapping、PathVariable 和 RequestParam；也可以用 RequestBody 接收结构化命令。',
+  },
+  {
+    language: 'Java',
+    framework: 'ako-spring',
+    code: `import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/student/{studentId}")
+public class StudentItemController {
+  @Transactional
+  @PatchMapping("/point")
+  public void point(
+      @PathVariable int studentId,
+      @RequestParam int point,
+      @RequestParam int mode) {
+    // 读取学生、校验权限、更新积分并提交事务。
+  }
+}`,
+    note: 'Java Spring 使用 PatchMapping、PathVariable、RequestParam 和 @Transactional；结构化命令也可以改用 RequestBody DTO。',
+  },
+]
+
+const springDataSetupExamples = [
+  {
+    language: 'Kotlin',
+    framework: 'ako-spring',
+    code: `import ako.spring.data.AkoJpaRepository
+import org.springframework.boot.autoconfigure.SpringBootApplication
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories
+
+@SpringBootApplication
+@EnableJpaRepositories(basePackageClasses = [TestEntityRepository::class])
+open class AkoSpringDataApplication
+
+interface TestEntityRepository : AkoJpaRepository<TestEntity, Int>`,
+    note: '测试通过 basePackageClasses 显式指定 Repository 扫描范围；Kotlin 项目使用 open class 或 kotlin-spring 插件。',
+  },
+  {
+    language: 'Java',
+    framework: 'ako-spring',
+    code: `import ako.spring.data.AkoJpaRepository;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+
+@SpringBootApplication
+@EnableJpaRepositories(basePackageClasses = TestEntityRepository.class)
+public class AkoSpringDataApplication {}
+
+public interface TestEntityRepository
+    extends AkoJpaRepository<TestEntity, Integer> {}`,
+    note: 'Java 使用 TestEntityRepository.class 指定扫描位置；Repository Bean 由 Spring Data 创建，不需要 Kotlin 的 open 关键字。',
+  },
+]
+
+const springDataModelExamples = [
+  {
+    language: 'Kotlin',
+    framework: 'ako-spring',
+    code: `import ako.model.base.CompleteModel
+import ako.spring.\`fun\`.findAccess
+import jakarta.persistence.Column
+import jakarta.persistence.Entity
+import jakarta.persistence.Table
+
+@Entity
+@Table(name = "ako_spring_test_entity")
+open class TestEntity : CompleteModel() {
+  @Column(nullable = false)
+  open var name: String = ""
+
+  companion object : TestEntityRepository by findAccess()
+}`,
+    note: '测试使用 companion object + findAccess() 获取延迟代理；JPA 代理字段和类需要可打开。',
+  },
+  {
+    language: 'Java',
+    framework: 'ako-spring',
+    code: `import ako.model.base.CompleteModel;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
+
+@Entity
+@Table(name = "ako_spring_test_entity")
+public class TestEntity extends CompleteModel {
+  @Column(nullable = false)
+  private String name = "";
+
+  public String getName() { return name; }
+  public void setName(String name) { this.name = name; }
+}`,
+    note: 'Java 不需要 companion object；在 Controller 或 Service 中通过构造器注入 TestEntityRepository。',
   },
 ]
 </script>
@@ -190,38 +461,13 @@ Spring 的 `{model}` 是通用模型控制器的关键。`page` 使用固定的 
 
 `ako-springboot-springdata` 会从 Spring `ApplicationContext` 中发现 `JpaRepository` Bean，并根据 Repository 的泛型参数确定它负责的 Ako 模型。控制器可以使用下面的基础接口；测试项目还显式声明了 Repository 扫描范围：
 
-```kotlin
-import ako.spring.data.AkoJpaRepository
-import org.springframework.boot.autoconfigure.SpringBootApplication
-import org.springframework.data.jpa.repository.config.EnableJpaRepositories
-
-@SpringBootApplication
-@EnableJpaRepositories(basePackageClasses = [TestEntityRepository::class])
-open class AkoSpringDataApplication
-
-interface TestEntityRepository : AkoJpaRepository<TestEntity, Int>
-```
+<CodeSwitch :variants="springDataSetupExamples" />
 
 如果 Repository 位于 `@SpringBootApplication` 的组件扫描范围内，可以按项目结构省略显式的 `@EnableJpaRepositories`；跨包或多模块项目建议像测试一样指定 `basePackageClasses`，确保 Repository 成为 Spring Bean。`AkoSpringDataDatabase` 只有在拿到这些 Bean 后，才能把模型放入 `AkoSpringRuntime.modelMap`。
 
 测试中的模型与伴生对象写法如下：
 
-```kotlin
-import ako.model.base.CompleteModel
-import ako.spring.`fun`.findAccess
-import jakarta.persistence.Column
-import jakarta.persistence.Entity
-import jakarta.persistence.Table
-
-@Entity
-@Table(name = "ako_spring_test_entity")
-open class TestEntity : CompleteModel() {
-  @Column(nullable = false)
-  open var name: String = ""
-
-  companion object : TestEntityRepository by findAccess()
-}
-```
+<CodeSwitch :variants="springDataModelExamples" />
 
 `findAccess()` 返回的是延迟解析的 Spring Access 代理；真正调用 Repository 时才从 ApplicationContext 取得 Bean。Kotlin 项目应使用 `kotlin-spring`/`all-open` 插件，或者像测试代码一样将 Spring 管理的类和可代理属性声明为 `open`。
 

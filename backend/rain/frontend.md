@@ -35,20 +35,7 @@ model/page、save、delete 完成数据交互
 
 实体字段的 Ako 注解在两个框架中完全相同：
 
-```kotlin
-@DbName("学生")
-@Entity
-class Student(
-  @DbName("姓名")
-  @Description("学生在管理后台中的展示名称")
-  @Required("请输入姓名")
-  var name: String = "",
-
-  @DbName("年龄")
-  @SearchType(SearchType.Type.GreaterEqual)
-  var age: Int = 0,
-) : CompleteModel()
-```
+<CodeSwitch :variants="metadataExamples" />
 
 `ako-rain` 和 `ako-spring` 都会把它转换为字段元数据：
 
@@ -78,6 +65,26 @@ interface StudentAccess : SoftDeleteAccess<Student, Int>`,
     note: 'Rain 通过 ClassRegister 注册 Access 接口，再由 AkoRain 从 Rain 容器获取 Access 实例和模型类型。',
   },
   {
+    language: 'Java',
+    framework: 'ako-rain',
+    code: `import ako.annotation.DbName;
+import ako.model.base.CompleteModel;
+import ako.rain.access.SoftDeleteAccess;
+import jakarta.persistence.Entity;
+
+@Entity
+@DbName("学生")
+public class Student extends CompleteModel {
+  private String name = "";
+
+  public String getName() { return name; }
+  public void setName(String name) { this.name = name; }
+}
+
+interface StudentAccess extends SoftDeleteAccess<Student, Integer> {}`,
+    note: 'Rain Java 通过 ClassRegister 注册 StudentAccess；Access 实例由 Rain DI 提供，不使用 Kotlin 的 companion object。',
+  },
+  {
     language: 'Kotlin',
     framework: 'ako-spring',
     code: `@Entity
@@ -91,6 +98,183 @@ open class Student : CompleteModel() {
 interface StudentRepository : SoftDeleteAccess<Student, Int>`,
     note: 'Spring 通过 ApplicationContext 发现 Repository Bean；AkoSpringRuntime 从 Repository 泛型解析模型类型并建立 modelMap。',
   },
+  {
+    language: 'Java',
+    framework: 'ako-spring',
+    code: `import ako.annotation.DbName;
+import ako.model.base.CompleteModel;
+import ako.spring.data.SoftDeleteAccess;
+import jakarta.persistence.Entity;
+
+@Entity
+@DbName("学生")
+public class Student extends CompleteModel {
+  private String name = "";
+
+  public String getName() { return name; }
+  public void setName(String name) { this.name = name; }
+}
+
+interface StudentRepository extends SoftDeleteAccess<Student, Integer> {}`,
+    note: 'Spring Java 通过 ApplicationContext 发现 StudentRepository Bean，并从泛型参数解析 Student；Repository 直接通过构造器注入。',
+  },
+]
+
+const metadataExamples = [
+  {
+    language: 'Kotlin',
+    framework: 'ako-rain',
+    code: `@DbName("学生")
+@Entity
+data class Student(
+  @DbName("姓名")
+  @Description("学生在管理后台中的展示名称")
+  @Required("请输入姓名")
+  var name: String = "",
+
+  @DbName("年龄")
+  @SearchType(SearchType.Type.GreaterEqual)
+  var age: Int = 0,
+) : CompleteModel()`,
+    note: 'Rain Kotlin 使用数据类声明实体；Ako 注解转换为相同的 DbField 元数据。',
+  },
+  {
+    language: 'Java',
+    framework: 'ako-rain',
+    code: `@DbName("学生")
+@Entity
+public class Student extends CompleteModel {
+  @DbName("姓名")
+  @Description("学生在管理后台中的展示名称")
+  @Required("请输入姓名")
+  private String name = "";
+
+  @DbName("年龄")
+  @SearchType(SearchType.Type.GreaterEqual)
+  private int age;
+
+  // JavaBean getters/setters omitted
+}`,
+    note: 'Rain Java 使用字段注解和 JavaBean 属性；页面元数据与 Kotlin 声明相同。',
+  },
+  {
+    language: 'Kotlin',
+    framework: 'ako-spring',
+    code: `@DbName("学生")
+@Entity
+open class Student : CompleteModel() {
+  @DbName("姓名")
+  @Description("学生在管理后台中的展示名称")
+  @Required("请输入姓名")
+  open var name: String = ""
+
+  @DbName("年龄")
+  @SearchType(SearchType.Type.GreaterEqual)
+  open var age: Int = 0
+}`,
+    note: 'Spring Kotlin 使用 open class/open var 适配 JPA 代理；Ako 注解效果不变。',
+  },
+  {
+    language: 'Java',
+    framework: 'ako-spring',
+    code: `@DbName("学生")
+@Entity
+public class Student extends CompleteModel {
+  @DbName("姓名")
+  @Description("学生在管理后台中的展示名称")
+  @Required("请输入姓名")
+  private String name = "";
+
+  @DbName("年龄")
+  @SearchType(SearchType.Type.GreaterEqual)
+  private int age;
+
+  // JavaBean getters/setters omitted
+}`,
+    note: 'Spring Java 使用普通 Java 实体和访问器；JVM 代理与 Bean 注解由 Spring/JPA 处理。',
+  },
+]
+
+const relationExamples = [
+  {
+    language: 'Kotlin',
+    framework: 'ako-rain',
+    code: `@DbName("小组")
+@Mapping(Group::class, display = "name")
+@Column(name = "group_id")
+var group: Int = 0`,
+    note: 'Rain Kotlin 的 @Mapping 生成关联字段，分页时由后端补充 information。',
+  },
+  {
+    language: 'Java',
+    framework: 'ako-rain',
+    code: `@DbName("小组")
+@Mapping(value = Group.class, display = "name")
+@Column(name = "group_id")
+private int group;`,
+    note: 'Rain Java 使用 Group.class；关联目标模型仍需被 Rain Runtime 发现。',
+  },
+  {
+    language: 'Kotlin',
+    framework: 'ako-spring',
+    code: `@DbName("小组")
+@Mapping(Group::class, display = "name")
+@Column(name = "group_id")
+open var group: Int = 0`,
+    note: 'Spring Kotlin 的关联声明与 Rain 相同，Repository 负责实际查询。',
+  },
+  {
+    language: 'Java',
+    framework: 'ako-spring',
+    code: `@DbName("小组")
+@Mapping(value = Group.class, display = "name")
+@Column(name = "group_id")
+private int group;`,
+    note: 'Spring Java 使用标准字段注解；Ako 前端仍消费同一个 ako:mapping 类型。',
+  },
+]
+
+const modelNodeExamples = [
+  {
+    language: 'Kotlin',
+    framework: 'ako-rain',
+    code: `@ModelNode(
+  pageNode = "sales-order-page",
+  tableNode = "sales-order-table",
+)
+class Order : CompleteModel()`,
+    note: '节点名只影响前端 View 选择，与 Rain 的 Access 无关。',
+  },
+  {
+    language: 'Java',
+    framework: 'ako-rain',
+    code: `@ModelNode(
+    pageNode = "sales-order-page",
+    tableNode = "sales-order-table"
+)
+public class Order extends CompleteModel {}`,
+    note: 'Java 使用注解命名参数；前端组件仍需预先注册。',
+  },
+  {
+    language: 'Kotlin',
+    framework: 'ako-spring',
+    code: `@ModelNode(
+  pageNode = "sales-order-page",
+  tableNode = "sales-order-table",
+)
+open class Order : CompleteModel()`,
+    note: 'Spring Kotlin 只把节点名写入 DbModel，不会自动注册 Vue 组件。',
+  },
+  {
+    language: 'Java',
+    framework: 'ako-spring',
+    code: `@ModelNode(
+    pageNode = "sales-order-page",
+    tableNode = "sales-order-table"
+)
+public class Order extends CompleteModel {}`,
+    note: 'Spring Java 使用相同的 ModelNode；组件注册仍在前端完成。',
+  },
 ]
 </script>
 
@@ -102,12 +286,7 @@ Spring 的 `SoftDeleteAccess` 来自 `ako.spring.data`，本质是 `JpaRepositor
 
 关联声明同样是共同层能力：
 
-```kotlin
-@DbName("小组")
-@Mapping(Group::class, display = "name")
-@Column(name = "group_id")
-var group: Int = 0
-```
+<CodeSwitch :variants="relationExamples" />
 
 两套实现都会生成 `type: "ako:mapping"`。分页响应的 `information` 提供关联实体，前端 `ako:mapping` TypeProvider 用它显示名称，并在搜索/编辑时打开关联模型的标准 View。关联目标模型也必须被对应 Runtime 发现。
 
@@ -126,13 +305,7 @@ var group: Int = 0
 
 模型级 `@ModelNode` 在两个框架中相同，它指定前端组件名，而不是后端路由：
 
-```kotlin
-@ModelNode(
-  pageNode = "sales-order-page",
-  tableNode = "sales-order-table",
-)
-class Order : CompleteModel()
-```
+<CodeSwitch :variants="modelNodeExamples" />
 
 前端必须先注册同名组件：
 

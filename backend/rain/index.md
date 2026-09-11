@@ -9,7 +9,7 @@ Ako 的 JVM 后端现在有两条可以接入同一套前端协议的实现：`a
 
 ## 先选择实现
 
-下面的代码块会记住你选择的框架，并同步本网站其他 JVM 代码示例。选择会保存到浏览器的 `localStorage`，键名为 `ako-code-switch-framework`。
+下面的代码块可以切换语言和框架，并同步本网站其他 JVM 代码示例。框架选择会保存到浏览器的 `localStorage`，键名为 `ako-code-switch-framework`；Java/Kotlin 代码块的语言选择保存到 `ako-code-switch-language`。
 
 <script setup lang="ts">
 const runtimeExamples = [
@@ -26,6 +26,20 @@ fun main() {
     note: 'Rain 负责启动、扫描和 DI；ako-rain 使用 SmartWeb 暴露控制器，并使用 SmartAccess/JPA 访问数据。',
   },
   {
+    language: 'Java',
+    framework: 'ako-rain',
+    code: `import rain.application.FullStackApplicationLauncher;
+
+public final class Application {
+  public static void main(String[] args) {
+    FullStackApplicationLauncher.launch();
+  }
+}
+
+// AkoRain 由 Rain 模块配置注册，负责发现 AkoAccess 和模型。`,
+    note: 'Java 直接调用 Rain 的 JVM 启动器；AkoRain 仍由 Rain 模块配置注册。',
+  },
+  {
     language: 'Kotlin',
     framework: 'ako-spring',
     code: `import org.springframework.boot.autoconfigure.SpringBootApplication
@@ -38,8 +52,24 @@ fun main(args: Array<String>) {
   runApplication<Application>(*args)
 }
 
-// AkoSpringRuntime 由对应的 Boot 自动配置注册。`,
+    // AkoSpringRuntime 由对应的 Boot 自动配置注册。`,
     note: 'Spring Boot 负责启动、组件扫描和 Bean 生命周期；ako-spring 通过 AkoSpringDatabase 连接 Repository 或自定义数据实现。',
+  },
+  {
+    language: 'Java',
+    framework: 'ako-spring',
+    code: `import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class Application {
+  public static void main(String[] args) {
+    SpringApplication.run(Application.class, args);
+  }
+}
+
+// AkoSpringRuntime 由对应的 Boot 自动配置注册。`,
+    note: 'Java 使用 SpringApplication.run 启动；AkoSpringRuntime 由对应的 Boot 自动配置注册。',
   },
 ]
 </script>

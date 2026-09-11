@@ -11,7 +11,7 @@ description: 在 ako-rain 或 ako-spring 中声明 JVM 实体、数据访问入�
 
 ## 最小模型
 
-下面的代码块是同一个“学生”模型在两套实现中的写法。选择一次 `ako-rain` 或 `ako-spring` 后，本网站其他 JVM 差异代码会跟随切换。
+下面的代码块是同一个“学生”模型在两套实现中的 Java/Kotlin 写法。选择一次语言和 `ako-rain`/`ako-spring` 框架后，本网站其他 JVM 差异代码会跟随切换。
 
 <script setup lang="ts">
 const modelExamples = [
@@ -43,6 +43,36 @@ interface StudentAccess : SoftDeleteAccess<Student, Int>` ,
     note: 'Rain 通过 ClassRegister 发现 StudentAccess，再从 SmartAccess 获取它的实现。测试代码使用 data class；复杂 JPA 场景仍应按实体代理要求验证。',
   },
   {
+    language: 'Java',
+    framework: 'ako-rain',
+    code: `package example.model;
+
+import ako.annotation.DbName;
+import ako.model.base.CompleteModel;
+import ako.rain.access.SoftDeleteAccess;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
+
+@DbName("学生")
+@Entity
+@Table
+public class Student extends CompleteModel {
+  @DbName("姓名")
+  private String name = "";
+
+  @DbName("年龄")
+  private int age = 0;
+
+  public String getName() { return name; }
+  public void setName(String name) { this.name = name; }
+  public int getAge() { return age; }
+  public void setAge(int age) { this.age = age; }
+}
+
+interface StudentAccess extends SoftDeleteAccess<Student, Integer> {}`,
+    note: 'Java Rain 实体不使用 Kotlin 伴生对象；通过 Rain DI 获取 StudentAccess。类和字段使用标准 JavaBean 访问器，便于 JPA 和 JSON 绑定。',
+  },
+  {
     language: 'Kotlin',
     framework: 'ako-spring',
     code: `package example.model
@@ -68,6 +98,36 @@ open class Student : CompleteModel() {
 
 interface StudentRepository : SoftDeleteAccess<Student, Int>` ,
     note: 'Spring Data JPA 需要 Repository Bean；示例使用 open class/open var 以适配 JPA 代理。SoftDeleteAccess 是 Spring Data 版本的 Repository 基类。',
+  },
+  {
+    language: 'Java',
+    framework: 'ako-spring',
+    code: `package example.model;
+
+import ako.annotation.DbName;
+import ako.model.base.CompleteModel;
+import ako.spring.data.SoftDeleteAccess;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
+
+@DbName("学生")
+@Entity
+@Table
+public class Student extends CompleteModel {
+  @DbName("姓名")
+  private String name = "";
+
+  @DbName("年龄")
+  private int age = 0;
+
+  public String getName() { return name; }
+  public void setName(String name) { this.name = name; }
+  public int getAge() { return age; }
+  public void setAge(int age) { this.age = age; }
+}
+
+interface StudentRepository extends SoftDeleteAccess<Student, Integer> {}`,
+    note: 'Java Spring 使用 Spring Data Repository Bean；JavaBean 访问器满足 JPA/JSON 绑定，不需要 Kotlin 的 companion object 或 open var。',
   },
   {
     language: 'JSON',
@@ -105,6 +165,22 @@ val rows = Student.whereQuery(
     note: 'Rain 自定义方法和分页查询使用 SmartAccess/JPA API。',
   },
   {
+    language: 'Java',
+    framework: 'ako-rain',
+    code: `import ako.rain.access.SoftDeleteAccess;
+import smartaccess.item.Page;
+
+interface StudentAccess extends SoftDeleteAccess<Student, Integer> {}
+
+List<Student> rows = access.whereQuery(
+  Map.of("name_like", "Alice"),
+  Map.of("age", "desc"),
+  new Page(0, 20),
+  "ASC"
+);`,
+    note: 'Java 通过 Rain DI 注入或查找 StudentAccess；SmartAccess 的 Page 使用从 0 开始的 offset。',
+  },
+  {
     language: 'Kotlin',
     framework: 'ako-spring',
     code: `val repository = findAccess<StudentRepository>()
@@ -117,6 +193,186 @@ val rows = repository.findAll(
   org.springframework.data.domain.Sort.by("age").descending(),
 )`,
     note: 'Spring Data 自定义方法遵循 Repository 派生查询规则；Ako 动态 page 请求由 AkoSpringDataDatabase 使用 Criteria API 处理。',
+  },
+  {
+    language: 'Java',
+    framework: 'ako-spring',
+    code: `import org.springframework.data.domain.Sort;
+
+interface StudentRepository extends SoftDeleteAccess<Student, Integer> {
+  List<Student> findByNameContainingIgnoreCase(String name);
+}
+
+List<Student> rows = studentRepository.findByNameContainingIgnoreCase("Alice");
+List<Student> ordered = studentRepository.findAll(
+  Sort.by("age").descending()
+);`,
+    note: 'Java Spring 直接注入 StudentRepository；领域查询使用 Spring Data 派生方法，Ako 通用 page 请求仍由 Criteria API 处理。',
+  },
+]
+
+const relationExamples = [
+  {
+    language: 'Kotlin',
+    framework: 'ako-rain',
+    code: `@DbName("小组")
+@Mapping(Group::class, display = "name")
+@Column(name = "group_id")
+var group: Int = 0
+
+@DbName("性别")
+@DbEnum("男", "女")
+var sex: Boolean = false`,
+    note: '关系和枚举注解属于 Ako 共同模型层，Rain 只负责发现并提供数据访问。',
+  },
+  {
+    language: 'Java',
+    framework: 'ako-rain',
+    code: `@DbName("小组")
+@Mapping(value = Group.class, display = "name")
+@Column(name = "group_id")
+private int group;
+
+@DbName("性别")
+@DbEnum({"男", "女"})
+private boolean sex;`,
+    note: 'Java 使用 Group.class 和数组注解参数；元数据效果与 Kotlin 写法相同。',
+  },
+  {
+    language: 'Kotlin',
+    framework: 'ako-spring',
+    code: `@DbName("小组")
+@Mapping(Group::class, display = "name")
+@Column(name = "group_id")
+open var group: Int = 0
+
+@DbName("性别")
+@DbEnum("男", "女")
+open var sex: Boolean = false`,
+    note: '关系和枚举注解不依赖 Spring；Spring Data 负责将关联模型接入 Repository 查询。',
+  },
+  {
+    language: 'Java',
+    framework: 'ako-spring',
+    code: `@DbName("小组")
+@Mapping(value = Group.class, display = "name")
+@Column(name = "group_id")
+private int group;
+
+@DbName("性别")
+@DbEnum({"男", "女"})
+private boolean sex;`,
+    note: 'Java Spring 使用标准 Java 字段和注解；Spring 与 Rain 最终生成相同的 DbField 元数据。',
+  },
+]
+
+const fieldVisibilityExamples = [
+  {
+    language: 'Kotlin',
+    framework: 'ako-rain',
+    code: `class InternalModel(
+  @TableIgnore
+  var internalNote: String = "",
+
+  @SearchIgnore
+  var description: String = "",
+
+  @EditIgnore
+  var createdAt: Long = 0,
+) : CompleteModel()`,
+    note: '这些显示注解在 Rain 和 Spring 中共享，只影响前端元数据区域。',
+  },
+  {
+    language: 'Java',
+    framework: 'ako-rain',
+    code: `public class InternalModel extends CompleteModel {
+  @TableIgnore
+  private String internalNote = "";
+
+  @SearchIgnore
+  private String description = "";
+
+  @EditIgnore
+  private long createdAt;
+
+  // JavaBean getters/setters omitted
+}`,
+    note: 'Java 用字段注解表达相同的搜索、表格和编辑隐藏规则。',
+  },
+  {
+    language: 'Kotlin',
+    framework: 'ako-spring',
+    code: `open class InternalModel : CompleteModel() {
+  @TableIgnore
+  open var internalNote: String = ""
+
+  @SearchIgnore
+  open var description: String = ""
+
+  @EditIgnore
+  open var createdAt: Long = 0
+}`,
+    note: 'Spring Data JPA 场景保留 open class/open var，以便 JPA 代理工作。',
+  },
+  {
+    language: 'Java',
+    framework: 'ako-spring',
+    code: `public class InternalModel extends CompleteModel {
+  @TableIgnore
+  private String internalNote = "";
+
+  @SearchIgnore
+  private String description = "";
+
+  @EditIgnore
+  private long createdAt;
+
+  // JavaBean getters/setters omitted
+}`,
+    note: 'Java 类天然可被 Spring/JPA 代理；仍需提供标准 JavaBean 访问器。',
+  },
+]
+
+const modelNodeExamples = [
+  {
+    language: 'Kotlin',
+    framework: 'ako-rain',
+    code: `@ModelNode(
+  pageNode = "sales-order-page",
+  tableNode = "sales-order-table",
+)
+class Order : CompleteModel()`,
+    note: 'ModelNode 只描述前端节点名称，与 Rain 的 Access 层无关。',
+  },
+  {
+    language: 'Java',
+    framework: 'ako-rain',
+    code: `@ModelNode(
+    pageNode = "sales-order-page",
+    tableNode = "sales-order-table"
+)
+public class Order extends CompleteModel {}`,
+    note: 'Java 使用标准注解命名参数；前端节点效果与 Kotlin 相同。',
+  },
+  {
+    language: 'Kotlin',
+    framework: 'ako-spring',
+    code: `@ModelNode(
+  pageNode = "sales-order-page",
+  tableNode = "sales-order-table",
+)
+open class Order : CompleteModel()`,
+    note: 'Spring 也只把节点名写入 DbModel，不会因为注解自动注册 Vue 组件。',
+  },
+  {
+    language: 'Java',
+    framework: 'ako-spring',
+    code: `@ModelNode(
+    pageNode = "sales-order-page",
+    tableNode = "sales-order-table"
+)
+public class Order extends CompleteModel {}`,
+    note: 'Java Spring 使用相同的 ModelNode；组件仍需在 Vue App 中注册。',
   },
 ]
 </script>
@@ -141,16 +397,7 @@ Spring 的 `ako-spring-common` 故意不让公共 `AkoAccess` 继承 `JpaReposit
 
 字段注解在两套实现中相同：
 
-```kotlin
-@DbName("小组")
-@Mapping(Group::class, display = "name")
-@Column(name = "group_id")
-var group: Int = 0
-
-@DbName("性别")
-@DbEnum("男", "女")
-var sex: Boolean = false
-```
+<CodeSwitch :variants="relationExamples" />
 
 `@Mapping` 会生成 `ako:mapping`，分页结果中的 `information` 负责补充关联模型；`@DbEnum` 和原生枚举会生成 `ako:enum`。关联目标模型也必须被对应框架发现。类型的 JSON 结构见 [字段类型与选项](/protocol/types)。
 
@@ -166,18 +413,7 @@ var sex: Boolean = false
 
 字段可以分别参与搜索、表格和编辑：
 
-```kotlin
-class InternalModel(
-  @TableIgnore
-  var internalNote: String = "",
-
-  @SearchIgnore
-  var description: String = "",
-
-  @EditIgnore
-  var createdAt: Long = 0,
-) : CompleteModel()
-```
+<CodeSwitch :variants="fieldVisibilityExamples" />
 
 - `@SearchIgnore`：不生成 `search`。
 - `@TableIgnore`：不生成 `column`。
@@ -189,13 +425,7 @@ class InternalModel(
 
 `@ModelNode` 在两套框架中也完全相同，它指定前端组件注册名，而不是后端路由：
 
-```kotlin
-@ModelNode(
-  pageNode = "sales-order-page",
-  tableNode = "sales-order-table",
-)
-class Order : CompleteModel()
-```
+<CodeSwitch :variants="modelNodeExamples" />
 
 前端需要注册同名组件；完整 props 和替换方式见 [前端参考](/frontend/reference) 与 [使用 Ako View 构建页面](/frontend/views)。
 

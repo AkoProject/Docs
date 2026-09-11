@@ -40,6 +40,18 @@ access.saveOrUpdate(student)`,
     note: 'Rain 的 Access 继承 SmartAccess 的 JpaAccess，由 ClassRegister 发现并由 Rain 容器提供实现。',
   },
   {
+    language: 'Java',
+    framework: 'ako-rain',
+    code: `import ako.rain.access.SoftDeleteAccess;
+
+public interface StudentAccess extends SoftDeleteAccess<Student, Integer> {}
+
+Student student = new Student();
+student.setName("Alice");
+studentAccess.saveOrUpdate(student);`,
+    note: 'Rain Java 使用接口继承声明 Access，并通过 Rain DI 注入 studentAccess；保存调用 SmartAccess 的 saveOrUpdate。',
+  },
+  {
     language: 'Kotlin',
     framework: 'ako-spring',
     code: `import ako.spring.data.SoftDeleteAccess
@@ -52,6 +64,21 @@ interface StudentRepository : SoftDeleteAccess<Student, Int> {
 val student = Student().apply { name = "Alice" }
 studentRepository.save(student)`,
     note: 'Spring Data Repository 是 Spring Bean；AkoSpringRuntime 从 ApplicationContext 延迟解析 findAccess() 返回的代理。',
+  },
+  {
+    language: 'Java',
+    framework: 'ako-spring',
+    code: `import ako.spring.data.SoftDeleteAccess;
+import java.util.List;
+
+public interface StudentRepository extends SoftDeleteAccess<Student, Integer> {
+  List<Student> findByNameContainingIgnoreCase(String name);
+}
+
+Student student = new Student();
+student.setName("Alice");
+studentRepository.save(student);`,
+    note: 'Spring Java 通过构造器注入 StudentRepository；Repository 既是 Spring Data JPA 接口，也是 Ako 模型的数据访问入口。',
   },
 ]
 
@@ -74,6 +101,24 @@ val page = Student.wherePage(
     note: 'Rain 的 SmartAccess Page 使用 offset；AkoRainModelContext 会把前端的 1-based page 转成 offset。',
   },
   {
+    language: 'Java',
+    framework: 'ako-rain',
+    code: `import java.util.List;
+import java.util.Map;
+import smartaccess.item.Page;
+
+List<Student> rows = studentAccess.whereQuery(
+  Map.<String, Object>of(
+    "name_like", "Alice",
+    "age_gte", 18
+  ),
+  Map.of("age", "desc"),
+  new Page(0, 20),
+  "ASC"
+);`,
+    note: 'Rain Java 直接调用 SmartAccess 的 whereQuery；Page 的第一个参数是从 0 开始的 offset。',
+  },
+  {
     language: 'Kotlin',
     framework: 'ako-spring',
     code: `// Spring Data 自定义查询
@@ -88,6 +133,27 @@ val page = runtime.modelMap["Student"]!!.wherePage(
   pSize = 20,
 )`,
     note: 'Spring Data 适合声明领域查询；AkoSpringDataDatabase 使用 Jakarta Criteria API 处理通用字段过滤和分页。',
+  },
+  {
+    language: 'Java',
+    framework: 'ako-spring',
+    code: `import ako.model.base.ModelContext;
+import ako.model.resp.PageResp;
+import ako.spring.AkoSpringRuntime;
+import java.util.Map;
+
+List<Student> rows = studentRepository.findByNameContainingIgnoreCase("Alice");
+
+ModelContext<?> context = AkoSpringRuntime.Companion.getInstance()
+  .getModelMap()
+  .get("Student");
+PageResp<?> page = context.wherePage(
+  Map.<String, Object>of("age_gte", 18),
+  Map.of("age", "DESC"),
+  1,
+  20
+);`,
+    note: 'Spring Java 使用 Repository 派生查询或 Runtime 的 modelMap；Ako 通用分页使用 1-based 页码并由 Criteria API 执行。',
   },
 ]
 
@@ -105,6 +171,24 @@ transaction {
     note: 'AkoRain.instance.transaction 使用 JPA EntityManager；活动事务会复用，否则开始、提交或回滚一个事务。',
   },
   {
+    language: 'Java',
+    framework: 'ako-rain',
+    code: `import ako.rain.AkoRain;
+import smartaccess.item.Page;
+import java.util.Map;
+
+AkoRain.Companion.getInstance().transaction(() -> {
+  Student student = studentAccess.findFirst(Map.of(), new Page(0, 1))
+    .stream()
+    .findFirst()
+    .orElseThrow();
+  student.setName(newName);
+  studentAccess.saveOrUpdate(student);
+  return null;
+});`,
+    note: 'Java 调用 AkoRain 的成员事务入口；实际项目中应从 Rain DI 获取 studentAccess。',
+  },
+  {
     language: 'Kotlin',
     framework: 'ako-spring',
     code: `import ako.spring.\`fun\`.transaction
@@ -115,6 +199,29 @@ transaction {
   studentRepository.save(student)
 }`,
     note: 'AkoSpringRuntime.transaction 使用 PlatformTransactionManager/TransactionTemplate，并以 REQUIRED 传播行为执行。',
+  },
+  {
+    language: 'Java',
+    framework: 'ako-spring',
+    code: `import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class StudentService {
+  private final StudentRepository repository;
+
+  public StudentService(StudentRepository repository) {
+    this.repository = repository;
+  }
+
+  @Transactional
+  public void rename(int studentId, String newName) {
+    Student student = repository.findById(studentId).orElseThrow();
+    student.setName(newName);
+    repository.save(student);
+  }
+}`,
+    note: 'Spring Java 通常使用 @Transactional；它与 Kotlin 的 transaction { } helper 都委托 PlatformTransactionManager。',
   },
 ]
 
@@ -133,6 +240,16 @@ student.delete()`,
     note: 'findAccess/accessOfModel 从 AkoRain.instance.accesses 查找 Rain Access。',
   },
   {
+    language: 'Java',
+    framework: 'ako-rain',
+    code: `StudentAccess access = /* 从 Rain DI 获取 */;
+
+Student student = new Student();
+access.saveOrUpdate(student);
+access.delete(student);`,
+    note: 'Java 直接调用 Access 的实例方法；Kotlin 的 reified findAccess/accessOfModel 和模型扩展函数不能直接照搬到 Java。',
+  },
+  {
     language: 'Kotlin',
     framework: 'ako-spring',
     code: `import ako.spring.\`fun\`.findAccess
@@ -142,6 +259,19 @@ val repository = findAccess<StudentRepository>()
 student.save()
 student.delete()`,
     note: 'Spring 的 findAccess 返回延迟代理；调用 save/delete 时由 AkoSpringRuntime 找到对应模型上下文和 Repository。',
+  },
+  {
+    language: 'Java',
+    framework: 'ako-spring',
+    code: `private final StudentRepository repository;
+
+public StudentService(StudentRepository repository) {
+  this.repository = repository;
+}
+
+repository.save(student);
+repository.delete(student);`,
+    note: 'Java Spring 通过构造器注入 Repository；不需要 companion object 或 Kotlin 扩展函数代理。',
   },
 ]
 </script>

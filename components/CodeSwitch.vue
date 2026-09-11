@@ -3,7 +3,9 @@ import { computed, onMounted, ref, watch } from 'vue'
 import {
   initializeCodeSwitchState,
   selectedCodeFramework,
+  selectedCodeLanguage,
   setCodeFramework,
+  setCodeLanguage,
 } from './codeSwitchState'
 
 export interface CodeVariant {
@@ -16,6 +18,7 @@ export interface CodeVariant {
 }
 
 const persistentFrameworks = new Set(['ako-rain', 'ako-spring'])
+const persistentLanguages = new Set(['Java', 'Kotlin'])
 
 const props = withDefaults(defineProps<{
   variants: CodeVariant[]
@@ -28,13 +31,22 @@ const props = withDefaults(defineProps<{
 
 const firstVariant = props.variants[0]
 const storedFramework = initializeCodeSwitchState().value
+const supportsGlobalLanguage = props.variants.some(it =>
+  persistentFrameworks.has(it.framework) && persistentLanguages.has(it.language),
+)
+const storedLanguage = supportsGlobalLanguage && persistentLanguages.has(selectedCodeLanguage.value ?? '')
+  ? selectedCodeLanguage.value
+  : undefined
 const storedVariant = storedFramework
   ? props.variants.find(it => persistentFrameworks.has(it.framework) && it.framework === storedFramework)
+  : undefined
+const storedLanguageVariant = storedLanguage
+  ? props.variants.find(it => it.language === storedLanguage)
   : undefined
 
 const initialLanguage = props.defaultLanguage && props.variants.some(it => it.language === props.defaultLanguage)
   ? props.defaultLanguage
-  : storedVariant?.language ?? firstVariant?.language ?? ''
+  : storedLanguageVariant?.language ?? storedVariant?.language ?? firstVariant?.language ?? ''
 const initialFramework = props.defaultFramework && props.variants.some(it =>
   it.language === initialLanguage && it.framework === props.defaultFramework,
 )
@@ -95,38 +107,70 @@ async function highlightCurrentCode() {
 
 function selectLanguage(language: string) {
   selectedLanguage.value = language
-  const firstForLanguage = props.variants.find(it => it.language === language)
-  if (firstForLanguage && !props.variants.some(it =>
+  const matchingFramework = props.variants.find(it =>
     it.language === language && it.framework === selectedFramework.value,
-  )) {
-    selectedFramework.value = firstForLanguage.framework
+  )
+    ?? props.variants.find(it =>
+      it.language === language && it.framework === selectedCodeFramework.value,
+    )
+    ?? props.variants.find(it => it.language === language)
+  if (matchingFramework) {
+    selectedFramework.value = matchingFramework.framework
   }
+  if (supportsGlobalLanguage && persistentLanguages.has(language)) setCodeLanguage(language)
 }
 
 function selectFramework(framework: string) {
-  selectedFramework.value = framework
-  const firstForFramework = props.variants.find(it =>
+  const matchingVariant = props.variants.find(it =>
     it.language === selectedLanguage.value && it.framework === framework,
   )
-  if (firstForFramework) selectedLanguage.value = firstForFramework.language
+    ?? props.variants.find(it =>
+      it.language === selectedCodeLanguage.value && it.framework === framework,
+    )
+    ?? props.variants.find(it => it.framework === framework)
+  if (matchingVariant) {
+    selectedFramework.value = matchingVariant.framework
+    selectedLanguage.value = matchingVariant.language
+  }
   if (persistentFrameworks.has(framework)) setCodeFramework(framework)
 }
 
 function applyGlobalFramework(framework: string | null) {
   if (!framework || !persistentFrameworks.has(framework)) return
-  const variant = props.variants.find(it => it.framework === framework)
+  const variant = props.variants.find(it =>
+    it.framework === framework && it.language === selectedCodeLanguage.value,
+  )
+    ?? props.variants.find(it => it.framework === framework)
   if (!variant) return
   selectedFramework.value = variant.framework
   selectedLanguage.value = variant.language
 }
 
+function applyGlobalLanguage(language: string | null) {
+  if (!supportsGlobalLanguage || !language || !persistentLanguages.has(language)) return
+  if (!props.variants.some(it => it.language === language)) return
+  selectedLanguage.value = language
+  const variant = props.variants.find(it =>
+    it.language === language && it.framework === selectedFramework.value,
+  )
+    ?? props.variants.find(it =>
+      it.language === language && it.framework === selectedCodeFramework.value,
+  )
+  if (!variant) {
+    const firstForLanguage = props.variants.find(it => it.language === language)
+    if (firstForLanguage) selectedFramework.value = firstForLanguage.framework
+  }
+}
+
 onMounted(() => {
   const state = initializeCodeSwitchState()
   applyGlobalFramework(state.value)
+  applyGlobalLanguage(selectedCodeLanguage.value)
   void highlightCurrentCode()
 })
 
 watch(selectedCodeFramework, framework => applyGlobalFramework(framework))
+watch(selectedCodeLanguage, language => applyGlobalLanguage(language))
 watch(currentVariant, () => {
   highlightedCode.value = ''
   void highlightCurrentCode()

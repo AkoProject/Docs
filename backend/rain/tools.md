@@ -38,6 +38,20 @@ student.delete()`,
     note: 'findAccess/accessOfModel 从 AkoRain.instance.accesses 获取 Rain Access；save/delete 调用 SmartAccess/JPA。',
   },
   {
+    language: 'Java',
+    framework: 'ako-rain',
+    code: `import ako.rain.access.SoftDeleteAccess;
+
+StudentAccess access = /* 从 Rain DI 获取 StudentAccess */;
+Student student = new Student();
+access.saveOrUpdate(student);
+access.delete(student);
+
+// Java 不直接调用 Kotlin 的 reified findAccess() 扩展，
+// 在服务或控制器中注入/查找 Access 即可。`,
+    note: 'Rain Java 代码通过 Rain DI 获取 Access；Kotlin 的 reified findAccess/accessOfModel 扩展不能直接作为 Java 方法调用。',
+  },
+  {
     language: 'Kotlin',
     framework: 'ako-spring',
     code: `import ako.spring.\`fun\`.findAccess
@@ -50,6 +64,26 @@ student.delete()
 // 需要按模型查找上下文时：
 val context = AkoSpringRuntime.instance.modelMap["Student"]`,
     note: 'Spring 的 findAccess 返回延迟代理，在调用时从 ApplicationContext 找到 Repository；模型上下文来自 AkoSpringDatabase。',
+  },
+  {
+    language: 'Java',
+    framework: 'ako-spring',
+    code: `import org.springframework.stereotype.Service;
+
+@Service
+public class StudentService {
+  private final StudentRepository repository;
+
+  public StudentService(StudentRepository repository) {
+    this.repository = repository;
+  }
+
+  public void update(Student student) {
+    repository.save(student);
+    repository.delete(student);
+  }
+}`,
+    note: 'Spring Java 代码直接通过构造器注入 Repository；Kotlin 的 companion object + findAccess() 代理不是 Java 必需写法。',
   },
 ]
 
@@ -67,6 +101,24 @@ transaction {
     note: 'AkoRain.instance.transaction 取得 EntityManager；活动事务会复用，否则开始、提交或回滚事务。',
   },
   {
+    language: 'Java',
+    framework: 'ako-rain',
+    code: `import ako.rain.AkoRain;
+import smartaccess.item.Page;
+import java.util.Map;
+
+AkoRain.Companion.getInstance().transaction(() -> {
+  Student student = access.findFirst(Map.of(), new Page(0, 1))
+      .stream()
+      .findFirst()
+      .orElseThrow();
+  student.setName(newName);
+  access.saveOrUpdate(student);
+  return null;
+});`,
+    note: 'Java 可以调用 AkoRain 的成员事务入口；示例省略 Access 的 Rain DI 获取，Page 仍使用 offset。',
+  },
+  {
     language: 'Kotlin',
     framework: 'ako-spring',
     code: `import ako.spring.\`fun\`.transaction
@@ -77,6 +129,29 @@ transaction {
   studentRepository.save(student)
 }`,
     note: 'AkoSpringRuntime.transaction 使用 TransactionTemplate，传播行为为 REQUIRED；事务管理器由 Spring 提供。',
+  },
+  {
+    language: 'Java',
+    framework: 'ako-spring',
+    code: `import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class StudentService {
+  private final StudentRepository repository;
+
+  public StudentService(StudentRepository repository) {
+    this.repository = repository;
+  }
+
+  @Transactional
+  public void rename(int studentId, String newName) {
+    Student student = repository.findById(studentId).orElseThrow();
+    student.setName(newName);
+    repository.save(student);
+  }
+}`,
+    note: 'Spring Java 通常使用 @Transactional；它与 Kotlin 的 transaction { } helper 都会委托 Spring PlatformTransactionManager。',
   },
 ]
 </script>

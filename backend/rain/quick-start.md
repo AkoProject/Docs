@@ -7,7 +7,7 @@ description: 使用 ako-rain 或 ako-spring 启动 JVM 后端，并接通 Ako �
 
 项目创建完成后，这一页负责把 JVM 后端真正启动起来。`ako-rain` 和 `ako-spring` 都要完成同一条 Ako 链路：注册 Runtime、发现模型、提供菜单/模型接口，再让前端打开页面。
 
-本页的差异代码使用统一的框架选择器。它会沿用你在其他 JVM 页面中的选择，并保存到浏览器 `localStorage`。
+本页的 JVM 代码使用统一的语言/框架选择器。它会沿用你在其他 JVM 页面中的选择，并保存到浏览器 `localStorage`。
 
 ## 依赖速查
 
@@ -50,6 +50,18 @@ fun main() {
     note: 'Rain 完整启动器负责模块初始化；ako-rain 通过 Rain 模块配置注册 AkoRain。',
   },
   {
+    language: 'Java',
+    framework: 'ako-rain',
+    code: `import rain.application.FullStackApplicationLauncher;
+
+public final class Application {
+  public static void main(String[] args) {
+    FullStackApplicationLauncher.launch();
+  }
+}`,
+    note: 'Java 直接调用 Rain 的 JVM 启动器；AkoRain 由 Rain 模块配置注册。',
+  },
+  {
     language: 'Kotlin',
     framework: 'ako-spring',
     code: `import org.springframework.boot.autoconfigure.SpringBootApplication
@@ -62,6 +74,20 @@ fun main(args: Array<String>) {
   runApplication<Application>(*args)
 }`,
     note: 'Spring Boot 自动配置负责创建 AkoSpringRuntime；不要手工再 new 一个 Runtime。',
+  },
+  {
+    language: 'Java',
+    framework: 'ako-spring',
+    code: `import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class Application {
+  public static void main(String[] args) {
+    SpringApplication.run(Application.class, args);
+  }
+}`,
+    note: 'Java 使用 SpringApplication.run 启动；Spring Boot 自动配置负责创建 AkoSpringRuntime。',
   },
 ]
 

@@ -11,7 +11,7 @@ Ako 的 JVM 后端有两种实现。先确认自己的应用宿主，再复制�
 - 已经使用 Spring Boot、Spring MVC、Spring Data JPA：选择 `ako-spring`。
 - Spring Boot 2 使用 `javax.persistence` 时，使用 Spring 公共运行时并自行提供数据库实现；Boot 3/4 才使用仓库中提供的 Spring Data JPA 适配器。
 
-如果你还没有宿主项目，请先阅读 [Rain 快速开始](https://rain.icecreamqaq.com/guide/getting-started) 或 [Spring Boot 文档](https://docs.spring.io/spring-boot/docs/current/reference/html/)。下面代码块的框架选择会在全站保持，并写入浏览器 `localStorage`。
+如果你还没有宿主项目，请先阅读 [Rain 快速开始](https://rain.icecreamqaq.com/guide/getting-started) 或 [Spring Boot 文档](https://docs.spring.io/spring-boot/docs/current/reference/html/)。下面 JVM 代码块可以切换 Java/Kotlin，框架和语言选择会在全站保持，并写入浏览器 `localStorage`。
 
 ## 依赖方式
 
@@ -77,6 +77,23 @@ src/main/resources/conf/
     note: 'Rain 使用模块配置、扫描范围和 SmartWeb 控制器。',
   },
   {
+    language: 'Java',
+    framework: 'ako-rain',
+    code: `src/main/java/example/
+├── Application.java
+├── controller/
+│   ├── AkoController.java
+│   ├── MenuController.java
+│   ├── ModelController.java
+│   └── AuthController.java
+└── model/
+    └── Student.java
+
+src/main/resources/conf/
+└── application.properties`,
+    note: 'Java Rain 项目使用 src/main/java；Rain 的模块配置、扫描范围和 SmartWeb 控制器目录不变。',
+  },
+  {
     language: '目录',
     framework: 'ako-spring',
     code: `src/main/kotlin/example/
@@ -94,6 +111,24 @@ src/main/resources/
 └── application.yml`,
     note: 'Spring 使用 Boot 自动配置、组件扫描、Spring MVC Controller 和 Spring Data Repository。',
   },
+  {
+    language: 'Java',
+    framework: 'ako-spring',
+    code: `src/main/java/example/
+├── Application.java
+├── controller/
+│   ├── AkoMenuController.java
+│   ├── AkoModelController.java
+│   └── AuthController.java
+├── model/
+│   └── Student.java
+└── repository/
+    └── StudentRepository.java
+
+src/main/resources/
+└── application.yml`,
+    note: 'Java Spring 项目使用 src/main/java；Boot 自动配置、Spring MVC Controller 和 Repository 的组织方式不变。',
+  },
 ]
 
 const launcherExamples = [
@@ -110,6 +145,20 @@ fun main() {
     note: '完整启动器负责 Rain 的应用类加载、模块初始化和扫描；ako-rain 再由 Rain 模块配置注册 AkoRain。',
   },
   {
+    language: 'Java',
+    framework: 'ako-rain',
+    code: `package example;
+
+import rain.application.FullStackApplicationLauncher;
+
+public final class Application {
+  public static void main(String[] args) {
+    FullStackApplicationLauncher.launch();
+  }
+}`,
+    note: 'Java 直接调用 Rain 的 JVM 启动器；AkoRain 仍由 Rain 模块配置注册。',
+  },
+  {
     language: 'Kotlin',
     framework: 'ako-spring',
     code: `package example
@@ -124,6 +173,22 @@ fun main(args: Array<String>) {
   runApplication<Application>(*args)
 }`,
     note: '对应的 Boot 自动配置会注册 AkoSpringRuntime；Spring 通过 ApplicationContext 发现数据库实现和 Repository Bean。',
+  },
+  {
+    language: 'Java',
+    framework: 'ako-spring',
+    code: `package example;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class Application {
+  public static void main(String[] args) {
+    SpringApplication.run(Application.class, args);
+  }
+}`,
+    note: 'Java 使用 SpringApplication.run 启动；Boot 自动配置会注册 AkoSpringRuntime。',
   },
 ]
 

@@ -511,6 +511,41 @@ interface StudentAccess : ako.rain.access.SoftDeleteAccess<Student, Int>`,
     note: 'Rain 侧由 ClassRegister 发现 StudentAccess，并通过 Rain DI 获取实现。',
   },
   {
+    language: 'Java',
+    framework: 'ako-rain',
+    code: `@DbName(value = "学生", index = 10)
+@MenuGroup(id = "school", name = "学校管理", index = 10)
+@ModelButton(name = "导出", url = "/api/student/export", type = "primary")
+@Entity
+@Table
+public class Student extends CompleteModel {
+  @DbName("小组")
+  @Mapping(value = Group.class, display = "name")
+  @Column(name = "group_id")
+  private int group;
+
+  @DbName("姓名")
+  @Required("请输入姓名")
+  @SearchType(SearchType.Type.Like)
+  private String name = "";
+
+  @DbName("年龄")
+  @RangeValidate(min = 1)
+  @TableColumnWidth(100)
+  private int age = 18;
+
+  @DbName("创建时间")
+  @Datetime
+  @EditIgnore
+  private long createdAt;
+
+  // JavaBean getters/setters omitted
+}
+
+interface StudentAccess extends ako.rain.access.SoftDeleteAccess<Student, Integer> {}`,
+    note: 'Java Rain 的注解参数使用 Java 的 value/class 语法；Access 仍由 Rain ClassRegister 和 DI 发现。',
+  },
+  {
     language: 'Kotlin',
     framework: 'ako-spring',
     code: `@DbName("学生", index = 10)
@@ -542,6 +577,41 @@ open class Student : CompleteModel() {
 
 interface StudentRepository : ako.spring.data.SoftDeleteAccess<Student, Int>`,
     note: 'Spring Data 侧由 Repository Bean 提供数据访问；open class/open var 用于 JPA 代理。',
+  },
+  {
+    language: 'Java',
+    framework: 'ako-spring',
+    code: `@DbName(value = "学生", index = 10)
+@MenuGroup(id = "school", name = "学校管理", index = 10)
+@ModelButton(name = "导出", url = "/api/student/export", type = "primary")
+@Entity
+@Table
+public class Student extends CompleteModel {
+  @DbName("小组")
+  @Mapping(value = Group.class, display = "name")
+  @Column(name = "group_id")
+  private int group;
+
+  @DbName("姓名")
+  @Required("请输入姓名")
+  @SearchType(SearchType.Type.Like)
+  private String name = "";
+
+  @DbName("年龄")
+  @RangeValidate(min = 1)
+  @TableColumnWidth(100)
+  private int age = 18;
+
+  @DbName("创建时间")
+  @Datetime
+  @EditIgnore
+  private long createdAt;
+
+  // JavaBean getters/setters omitted
+}
+
+interface StudentRepository extends ako.spring.data.SoftDeleteAccess<Student, Integer> {}`,
+    note: 'Java Spring 的实体声明与 Rain 共用 Ako 注解；Repository Bean 由 Spring Data 发现，JPA 代理不需要 Kotlin 的 open 关键字。',
   },
 ]
 </script>

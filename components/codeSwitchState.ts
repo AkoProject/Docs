@@ -1,7 +1,9 @@
 import { ref } from 'vue'
 
 export const codeSwitchStorageKey = 'ako-code-switch-framework'
+export const codeSwitchLanguageStorageKey = 'ako-code-switch-language'
 export const selectedCodeFramework = ref<string | null>(null)
+export const selectedCodeLanguage = ref<string | null>(null)
 
 let initialized = false
 
@@ -14,15 +16,26 @@ function readStoredFramework(): string | null {
   }
 }
 
+function readStoredLanguage(): string | null {
+  if (typeof window === 'undefined') return null
+  try {
+    return window.localStorage.getItem(codeSwitchLanguageStorageKey)
+  } catch {
+    return null
+  }
+}
+
 function updateFromEvent(event: Event) {
   if (event instanceof StorageEvent) {
-    if (event.key !== codeSwitchStorageKey) return
-    selectedCodeFramework.value = event.newValue
+    if (event.key === codeSwitchStorageKey) selectedCodeFramework.value = event.newValue
+    if (event.key === codeSwitchLanguageStorageKey) selectedCodeLanguage.value = event.newValue
     return
   }
 
   const value = (event as CustomEvent<string | null>).detail
-  if (typeof value === 'string' || value === null) selectedCodeFramework.value = value
+  if (typeof value !== 'string' && value !== null) return
+  if (event.type === 'ako-code-switch-framework-change') selectedCodeFramework.value = value
+  if (event.type === 'ako-code-switch-language-change') selectedCodeLanguage.value = value
 }
 
 export function initializeCodeSwitchState() {
@@ -30,8 +43,10 @@ export function initializeCodeSwitchState() {
 
   if (!initialized) {
     selectedCodeFramework.value = readStoredFramework()
+    selectedCodeLanguage.value = readStoredLanguage()
     window.addEventListener('storage', updateFromEvent)
     window.addEventListener('ako-code-switch-framework-change', updateFromEvent)
+    window.addEventListener('ako-code-switch-language-change', updateFromEvent)
     initialized = true
   }
 
@@ -51,5 +66,21 @@ export function setCodeFramework(framework: string) {
 
   window.dispatchEvent(new CustomEvent('ako-code-switch-framework-change', {
     detail: framework,
+  }))
+}
+
+export function setCodeLanguage(language: string) {
+  initializeCodeSwitchState()
+  selectedCodeLanguage.value = language
+
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(codeSwitchLanguageStorageKey, language)
+  } catch {
+    // Private browsing or a restrictive browser policy may disable storage.
+  }
+
+  window.dispatchEvent(new CustomEvent('ako-code-switch-language-change', {
+    detail: language,
   }))
 }
