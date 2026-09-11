@@ -12,6 +12,7 @@ export interface CodeVariant {
   framework: string
   code: string
   note?: string
+  syntax?: string
 }
 
 const persistentFrameworks = new Set(['ako-rain', 'ako-spring'])
@@ -43,6 +44,8 @@ const initialFramework = props.defaultFramework && props.variants.some(it =>
 const selectedLanguage = ref(initialLanguage)
 const selectedFramework = ref(storedVariant?.framework ?? initialFramework)
 const copied = ref(false)
+const highlightedCode = ref('')
+let highlightRequest = 0
 
 const languageOptions = computed(() => Array.from(new Set(props.variants.map(it => it.language))))
 const frameworkOptions = computed(() => Array.from(new Set(
@@ -59,6 +62,36 @@ const currentVariant = computed<CodeVariant>(() => {
     ?? props.variants[0]
     ?? { language: '', framework: '', code: '' }
 })
+
+const syntaxAliases: Record<string, string> = {
+  'Kotlin DSL': 'kotlin',
+  '目录': 'text',
+}
+
+function syntaxFor(variant: CodeVariant) {
+  return variant.syntax ?? syntaxAliases[variant.language] ?? variant.language.toLowerCase()
+}
+
+async function highlightCurrentCode() {
+  const request = ++highlightRequest
+  const variant = currentVariant.value
+
+  try {
+    const { codeToHtml } = await import('shiki')
+    const html = await codeToHtml(variant.code, {
+      lang: syntaxFor(variant),
+      themes: {
+        light: 'github-light',
+        dark: 'github-dark',
+      },
+      defaultColor: false,
+    })
+    if (request === highlightRequest) highlightedCode.value = html
+  } catch {
+    // Keep the plain-text fallback for an unknown or unavailable language.
+    if (request === highlightRequest) highlightedCode.value = ''
+  }
+}
 
 function selectLanguage(language: string) {
   selectedLanguage.value = language
@@ -90,9 +123,14 @@ function applyGlobalFramework(framework: string | null) {
 onMounted(() => {
   const state = initializeCodeSwitchState()
   applyGlobalFramework(state.value)
+  void highlightCurrentCode()
 })
 
 watch(selectedCodeFramework, framework => applyGlobalFramework(framework))
+watch(currentVariant, () => {
+  highlightedCode.value = ''
+  void highlightCurrentCode()
+})
 
 async function copyCode() {
   const code = currentVariant.value.code
@@ -154,7 +192,12 @@ async function copyCode() {
       <span aria-hidden="true">·</span>
       <span>{{ currentVariant.framework }}</span>
     </div>
-    <pre><code>{{ currentVariant.code }}</code></pre>
+    <div
+      v-if="highlightedCode"
+      class="ako-code-switch__highlighted"
+      v-html="highlightedCode"
+    />
+    <pre v-else><code>{{ currentVariant.code }}</code></pre>
     <p v-if="currentVariant.note" class="ako-code-switch__note">{{ currentVariant.note }}</p>
   </div>
 </template>
