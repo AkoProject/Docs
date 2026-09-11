@@ -4,8 +4,56 @@ export const codeSwitchStorageKey = 'ako-code-switch-framework'
 export const codeSwitchLanguageStorageKey = 'ako-code-switch-language'
 export const selectedCodeFramework = ref<string | null>(null)
 export const selectedCodeLanguage = ref<string | null>(null)
+export const codeSwitchInteractionRevision = ref(0)
 
 let initialized = false
+let nextInteractionId = 0
+let activeInteraction: { element: HTMLElement; id: number; pending: number } | null = null
+
+export interface CodeSwitchInteractionUpdate {
+  interactionId: number
+  completed: boolean
+}
+
+export function beginCodeSwitchInteraction(element: HTMLElement | null) {
+  if (!element) return null
+  const interaction = { element, id: ++nextInteractionId, pending: 0 }
+  activeInteraction = interaction
+  codeSwitchInteractionRevision.value += 1
+  setTimeout(() => {
+    if (activeInteraction?.id === interaction.id && interaction.pending === 0) {
+      activeInteraction = null
+      codeSwitchInteractionRevision.value += 1
+    }
+  }, 1000)
+  return interaction.id
+}
+
+export function getActiveCodeSwitchInteraction() {
+  return activeInteraction
+}
+
+export function registerCodeSwitchUpdate(interactionId: number): CodeSwitchInteractionUpdate | null {
+  if (!activeInteraction || activeInteraction.id !== interactionId) return null
+  activeInteraction.pending += 1
+  codeSwitchInteractionRevision.value += 1
+  return { interactionId, completed: false }
+}
+
+export function completeCodeSwitchUpdate(update: CodeSwitchInteractionUpdate) {
+  if (update.completed) return
+  update.completed = true
+  if (activeInteraction?.id !== update.interactionId) return
+  activeInteraction.pending = Math.max(0, activeInteraction.pending - 1)
+  codeSwitchInteractionRevision.value += 1
+}
+
+export function clearCodeSwitchInteraction(element: HTMLElement, id: number) {
+  if (activeInteraction?.element === element && activeInteraction.id === id) {
+    activeInteraction = null
+    codeSwitchInteractionRevision.value += 1
+  }
+}
 
 function readStoredFramework(): string | null {
   if (typeof window === 'undefined') return null

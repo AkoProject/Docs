@@ -13,6 +13,8 @@ description: Ako 前端运行时、内置 API、弹窗、类型工具和按钮�
 
 JVM 文档中的 `ako-rain` / `ako-spring` 代码块使用同一个全局选择项。点击任意一个框架按钮后，其他 JVM 代码块会同步切换；Java/Kotlin 代码块还可以统一切换语言。页面刷新或重新打开文档后仍会保留选择，框架和语言分别保存在浏览器 `localStorage` 的 `ako-code-switch-framework` 与 `ako-code-switch-language` 键中。
 
+不同语言或框架的代码长度不一致时，切换器会在切换完成后重新计算自身的页面位置，并把视口恢复到切换前的相对位置，不会额外创建内部滚动条或把当前阅读内容挤走。
+
 ## 运行时 `Ako`
 
 `Ako` 是 Vue 插件，也是前端 API 和元数据的运行时容器：

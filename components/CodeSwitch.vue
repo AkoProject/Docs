@@ -1,12 +1,19 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import {
+  beginCodeSwitchInteraction,
+  clearCodeSwitchInteraction,
+  codeSwitchInteractionRevision,
+  completeCodeSwitchUpdate,
+  getActiveCodeSwitchInteraction,
   initializeCodeSwitchState,
+  registerCodeSwitchUpdate,
   selectedCodeFramework,
   selectedCodeLanguage,
   setCodeFramework,
   setCodeLanguage,
 } from './codeSwitchState'
+import type { CodeSwitchInteractionUpdate } from './codeSwitchState'
 
 export interface CodeVariant {
   id?: string
@@ -57,7 +64,13 @@ const selectedLanguage = ref(initialLanguage)
 const selectedFramework = ref(storedVariant?.framework ?? initialFramework)
 const copied = ref(false)
 const highlightedCode = ref('')
+const codeSwitchRoot = ref<HTMLElement | null>(null)
 let highlightRequest = 0
+let layoutSnapshot: {
+  element: HTMLElement
+  viewportTop: number
+  interactionId: number
+} | null = null
 
 const languageOptions = computed(() => Array.from(new Set(props.variants.map(it => it.language))))
 const frameworkOptions = computed(() => Array.from(new Set(
@@ -84,7 +97,7 @@ function syntaxFor(variant: CodeVariant) {
   return variant.syntax ?? syntaxAliases[variant.language] ?? variant.language.toLowerCase()
 }
 
-async function highlightCurrentCode() {
+async function highlightCurrentCode(update: CodeSwitchInteractionUpdate | null = null) {
   const request = ++highlightRequest
   const variant = currentVariant.value
 
@@ -98,14 +111,67 @@ async function highlightCurrentCode() {
       },
       defaultColor: false,
     })
-    if (request === highlightRequest) highlightedCode.value = html
+    if (request === highlightRequest) {
+      highlightedCode.value = html
+    }
   } catch {
     // Keep the plain-text fallback for an unknown or unavailable language.
-    if (request === highlightRequest) highlightedCode.value = ''
+    if (request === highlightRequest) {
+      highlightedCode.value = ''
+    }
+  } finally {
+    if (update) {
+      await nextTick()
+      completeCodeSwitchUpdate(update)
+    }
+  }
+}
+
+function snapshotCodeSwitchPosition() {
+  const element = codeSwitchRoot.value
+  const interaction = getActiveCodeSwitchInteraction()
+  if (!element || !interaction || interaction.element !== element) return
+  const rect = element.getBoundingClientRect()
+  if (layoutSnapshot?.element === element) {
+    layoutSnapshot.interactionId = interaction.id
+    return
+  }
+
+  layoutSnapshot = {
+    element,
+    viewportTop: rect.top,
+    interactionId: interaction.id,
+  }
+}
+
+async function restoreCodeSwitchPosition(final: boolean) {
+  await nextTick()
+  const snapshot = layoutSnapshot
+  const interaction = getActiveCodeSwitchInteraction()
+  if (!snapshot) return
+
+  if (
+    !interaction
+    || interaction.element !== snapshot.element
+    || interaction.id !== snapshot.interactionId
+  ) {
+    if (final) layoutSnapshot = null
+    return
+  }
+
+  const currentPageTop = snapshot.element.getBoundingClientRect().top + window.scrollY
+  const targetScrollY = currentPageTop - snapshot.viewportTop
+  if (Math.abs(targetScrollY - window.scrollY) > 0.5) window.scrollTo(0, targetScrollY)
+
+  if (final) {
+    layoutSnapshot = null
+    clearCodeSwitchInteraction(snapshot.element, snapshot.interactionId)
   }
 }
 
 function selectLanguage(language: string) {
+  beginCodeSwitchInteraction(codeSwitchRoot.value)
+  snapshotCodeSwitchPosition()
   selectedLanguage.value = language
   const matchingFramework = props.variants.find(it =>
     it.language === language && it.framework === selectedFramework.value,
@@ -121,6 +187,8 @@ function selectLanguage(language: string) {
 }
 
 function selectFramework(framework: string) {
+  beginCodeSwitchInteraction(codeSwitchRoot.value)
+  snapshotCodeSwitchPosition()
   const matchingVariant = props.variants.find(it =>
     it.language === selectedLanguage.value && it.framework === framework,
   )
@@ -172,8 +240,19 @@ onMounted(() => {
 watch(selectedCodeFramework, framework => applyGlobalFramework(framework))
 watch(selectedCodeLanguage, language => applyGlobalLanguage(language))
 watch(currentVariant, () => {
+  const interaction = getActiveCodeSwitchInteraction()
+  const update = interaction ? registerCodeSwitchUpdate(interaction.id) : null
   highlightedCode.value = ''
-  void highlightCurrentCode()
+  void highlightCurrentCode(update)
+})
+watch(codeSwitchInteractionRevision, () => {
+  const interaction = getActiveCodeSwitchInteraction()
+  if (!layoutSnapshot || !interaction || interaction.pending < 0) return
+  if (
+    interaction.element !== layoutSnapshot.element
+    || interaction.id !== layoutSnapshot.interactionId
+  ) return
+  void restoreCodeSwitchPosition(interaction.pending === 0)
 })
 
 async function copyCode() {
@@ -196,7 +275,7 @@ async function copyCode() {
 </script>
 
 <template>
-  <div class="ako-code-switch">
+  <div ref="codeSwitchRoot" class="ako-code-switch">
     <div class="ako-code-switch__toolbar">
       <div v-if="languageOptions.length > 1" class="ako-code-switch__selector">
         <span class="ako-code-switch__label">语言</span>
