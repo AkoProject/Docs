@@ -4,10 +4,12 @@ export default defineConfig({
   lang: 'zh-CN',
   title: 'Ako',
   description: 'Ako 业务快速启动框架：由后端声明驱动的前端管理后台。',
+  srcExclude: ['repos/**', 'showcase/**'],
   themeConfig: {
     logo: '/ako-mark.svg',
     siteTitle: 'Ako',
     nav: [
+      { text: '能力展示', link: '/guide/showcase' },
       { text: '前端', link: '/frontend/quick-start' },
       { text: '后端（JVM）', link: '/backend/rain/project' },
       { text: '后端（JavaScript）', link: '/backend/javascript/project' },
@@ -116,6 +118,7 @@ export default defineConfig({
         {
           text: 'Ako 概览',
           items: [
+            { text: 'Ako 能做什么', link: '/guide/showcase' },
             { text: 'Ako 是什么', link: '/guide/introduction' },
             { text: '快速开始', link: '/guide/quick-start' },
             { text: '整体架构', link: '/guide/architecture' },

@@ -203,3 +203,92 @@
     margin-left: 0;
   }
 }
+
+/* 能力展示页 */
+.ako-shot {
+  margin: 28px 0;
+}
+
+.ako-shot img {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 12px;
+  box-shadow: 0 18px 48px rgba(18, 35, 63, 0.14);
+}
+
+.ako-shot figcaption {
+  margin-top: 12px;
+  color: var(--ako-muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.ako-shot figcaption strong {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--vp-c-text-1);
+  font-size: 15px;
+}
+
+.ako-shot--hero img {
+  box-shadow: 0 28px 70px rgba(30, 74, 125, 0.22);
+}
+
+.ako-shot--hero figcaption {
+  text-align: center;
+}
+
+.ako-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 32px 0 8px;
+}
+
+.ako-stat {
+  padding: 18px 20px;
+  border: 1px solid rgba(46, 149, 255, 0.22);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(46, 149, 255, 0.1), transparent 70%), var(--ako-panel);
+}
+
+.ako-stat strong {
+  display: block;
+  background: linear-gradient(120deg, #2e95ff 12%, #8f7cff 82%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.ako-stat span {
+  color: var(--ako-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.ako-gallery .ako-shot {
+  margin: 36px 0 48px;
+}
+
+.ako-gallery figcaption {
+  margin: 0 0 14px;
+  font-size: 15px;
+}
+
+.ako-gallery figcaption strong {
+  font-size: 17px;
+}
+
+@media (max-width: 768px) {
+  .ako-stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.ako-home-shot {
+  margin: 8px auto 40px;
+}
