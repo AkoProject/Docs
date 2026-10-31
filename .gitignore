@@ -3,3 +3,8 @@
 .vitepress/dist
 .vitepress/cache
 .idea/
+/showcase/jvm/run/
+/showcase/jvm/build/
+/showcase/jvm/.gradle/
+/showcase/jvm/.kotlin/
+/showcase/web/node_modules/
