@@ -25,3 +25,4 @@ $:
             mkdir repos && cd repos && \
             git clone https://github.com/AkoProject/Frontend
             git clone https://github.com/AkoProject/JVM
+            git clone https://github.com/AkoProject/JavaScript
