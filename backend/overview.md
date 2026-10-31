@@ -1,23 +1,28 @@
 ---
 title: 后端实现概览
-description: Ako 后端适配器的分层方式，以及如何接入任意语言和框架。
+description: Ako 后端适配器如何分层，现有的 JVM 与 JavaScript 实现，以及如何接入其他语言和框架。
 ---
 
 # 后端实现概览
 
-Ako 后端不是一个固定的 Controller + ORM 模板，而是一层协议适配。当前 Ako 实现包括 JVM 核心、`ako-rain`、`ako-spring` 和独立的 JavaScript/TypeScript 实验仓库；协议设计允许其他语言和框架提供同样的 HTTP 响应。
+Ako 后端不是一套固定的 Controller + ORM 模板，而是一层协议适配：把已有的模型和数据访问能力转换成 Ako 协议要求的 HTTP 接口。现有的实现有两套：
+
+- 后端（JVM）：`ako-core` 加上 `ako-rain`、`ako-spring` 两个适配器。
+- 后端（JavaScript）：一个独立仓库中的 TypeScript 实验性实现。
+
+只要能返回同样的 HTTP 响应，其他语言和框架也可以实现自己的后端。
 
 ## 推荐分层
 
-| 层 | 应该负责什么 | 是否属于 Ako 协议 |
+| 层 | 负责什么 | 和 Ako 协议的关系 |
 | --- | --- | --- |
-| 业务模型 | 字段、关系、业务规则、生命周期 | 否，适配器读取它 |
-| 数据访问 | 查询、分页、保存、删除、事务 | 否 |
-| Web/框架适配 | 路由、参数绑定、序列化、认证 | 否 |
-| Ako adapter | 将上面能力转成 `menu` 与 `model` 接口 | 是连接点 |
-| 前端渲染器 | 读取元数据并生成页面 | 协议消费者 |
+| 业务模型 | 字段、关系、业务规则、生命周期 | 不属于协议，由适配器读取 |
+| 数据访问 | 查询、分页、保存、删除、事务 | 不属于协议 |
+| Web 框架 | 路由、参数绑定、序列化、认证 | 不属于协议 |
+| Ako 适配器 | 把上面几层的能力转换成 `menu` 和 `model` 接口 | 与协议对接的地方 |
+| 前端 | 读取元数据并生成页面 | 协议的使用方 |
 
-一个适配器的核心不是复制 JVM 类名，而是稳定地产出：
+适配器不需要照搬 JVM 的类名，关键是稳定地完成下面四件事：
 
 ```text
 模型定义 ──> 元数据生成器 ──> menu/list
@@ -26,63 +31,68 @@ Ako 后端不是一个固定的 Controller + ORM 模板，而是一层协议适�
 ID 列表 ──> 权限 + 主键转换 + 事务 ──> delete
 ```
 
-## 当前 JVM 组成
+## JVM 实现
 
 ### `ako-core`
 
-定义协议数据结构和模型元数据转换的基础接口，包括：
+定义协议的数据结构，以及从模型类生成元数据的基础接口，包括：
 
 - `DbModel`、`DbField`。
-- 搜索、表格、编辑信息。
-- 枚举、关联、时间和自定义类型的 TypeProvider 接口。
-- 模型按钮、行级按钮和操作面板。
-- `ModelPageReq` 与 `ModelPageResp`。
+- 搜索、表格、编辑三处的展示信息。
+- 枚举、关联、时间和自定义类型使用的类型提供者接口 `AkoTypeProvider`。
+- 页面级按钮、行级按钮和操作面板。
+- `ModelPageReq` 和 `ModelPageResp`。
 
 ### `ako-jpa`
 
-提供 JPA 模型基础类和查询辅助。`CompleteModel` 组合了 ID、创建/更新时间和软删除字段；它是 JVM + JPA 方向的便利基类，不是协议要求。
+提供 JPA 模型基类和查询辅助函数。`CompleteModel` 组合了 ID、创建/更新时间和软删除字段，是 JVM + JPA 场景下的便利基类，协议并不要求使用它。
 
 ### `ako-rain`
 
-当前 JVM 主适配器。它通过 Rain 的扫描与 Bean 容器发现 `AkoAccess`，通过 SmartAccess/JPA 执行分页、查询、保存和删除，并把 Rain 控制器映射到 Ako 接口。
+基于 Rain 的适配器。它通过 Rain 的类扫描和 Bean 容器找到业务中的 `AkoAccess` 接口，用 SmartAccess/JPA 完成分页、查询、保存和删除，并提供 `IMenuController`、`IModelController` 两个控制器接口，业务控制器实现它们就能暴露 Ako 接口。
 
 ### `ako-spring`
 
-当前实现由公共 Runtime、Boot 2/3/4 自动配置和可选的 Spring Data JPA 数据库模块组成。Boot 3/4 可使用 `ako-springboot-springdata`；Boot 2 由于 `javax.persistence` 与 `ako-jpa` 的 Jakarta API 不同，应使用公共 SPI 自定义 `AkoSpringDatabase`。
+基于 Spring Boot 的适配器，由公共运行时模块、Boot 2/3/4 各自的自动配置模块，以及可选的 Spring Data JPA 数据库模块组成。Boot 3/4 可以直接使用 `ako-springboot-springdata`；Boot 2 使用的是 `javax.persistence`，与 `ako-jpa` 依赖的 Jakarta API 不兼容，需要通过公共 SPI 自己实现 `AkoSpringDatabase`。
 
-### JavaScript
+## JavaScript 实现
 
-[`AkoProject/JavaScript`](https://github.com/AkoProject/JavaScript) 是一个 Node.js/Bun 上的 TypeScript 协议适配器实验。它使用显式 schema 生成 `DbModel`/`DbField`，用 `AkoRepository` 抽象 Prisma、Drizzle、TypeORM、SQL 或远程数据服务，并将 Node `http` 与 Bun `serve` 放在独立适配器中。它不内置 ORM、session 或事务实现。
+[`AkoProject/JavaScript`](https://github.com/AkoProject/JavaScript) 是运行在 Node.js 和 Bun 上的 TypeScript 实验性实现，采用 Yarn Monorepo 组织。核心包 `@ako-dev/ako-js` 用显式 schema 生成 `DbModel`/`DbField`，并通过 `AkoRepository` 接口对接数据层。Web 框架和 ORM 的接入都拆成独立的包：
 
-从 [后端（JavaScript）](/backend/javascript/) 开始，按 [Monorepo 与 package](/backend/javascript/monorepo) → [项目创建与启动](/backend/javascript/project) → [模型与元数据](/backend/javascript/models) → [Repository 与数据访问](/backend/javascript/data-access) → [适配器总览](/backend/javascript/adapters) 阅读。
+- Web 框架：Node `http`、Bun、Express、Fastify、Hono、Koa。
+- 数据访问：Prisma、Drizzle、TypeORM、Sequelize，以及用于测试和原型的内存 Repository。
 
-## 实现其他语言/框架
+核心包本身不包含 ORM、Session 或事务实现，这些交给宿主应用。
 
-不需要实现 JVM 的 `Class`、注解或 `AkoAccess`。JavaScript 实现已经采用显式 schema + repository adapter；其他语言也可以采用：
+建议按以下顺序阅读：[后端（JavaScript）](/backend/javascript/) → [Monorepo 与包结构](/backend/javascript/monorepo) → [项目创建与启动](/backend/javascript/project) → [模型与元数据](/backend/javascript/models) → [Repository 与数据访问](/backend/javascript/data-access) → [适配器总览](/backend/javascript/adapters)。
 
-- 显式 schema 文件生成元数据。
-- 结构体/类上的装饰器或注解生成元数据。
-- 数据库 schema + 配置生成元数据。
-- 手写 `models` JSON 和模型处理器。
+## 用其他语言或框架实现
 
-最低可用路径是先只支持 `ako:text`：
+不需要模仿 JVM 的 `Class`、注解或 `AkoAccess`。JavaScript 实现用的就是显式 schema 加 Repository 的方式。生成元数据的方式可以任选：
 
-1. `menu/list/{channel}` 返回一个模型和一个文本字段。
+- 用显式的 schema 文件生成。
+- 用结构体或类上的装饰器、注解生成。
+- 用数据库 schema 加配置生成。
+- 直接手写 `models` JSON 和对应的处理逻辑。
+
+最快的做法是先只支持 `ako:text`：
+
+1. `menu/list/{channel}` 返回一个模型，模型里只有一个文本字段。
 2. `model/page/{model}` 返回空分页或真实数据。
 3. `model/save/{model}` 和 `model/delete/{model}` 返回 2xx。
-4. 前端页面跑通后，再增加枚举、关联、校验和按钮。
+4. 前端页面能正常打开后，再逐步加上枚举、关联、校验和按钮。
 
-协议详情见 [交互规则](/protocol/http-api)、[模型定义](/protocol/metadata) 和 [字段类型与选项](/protocol/types)。
+协议细节见 [交互规则](/protocol/http-api)、[模型定义](/protocol/metadata) 和 [字段类型与选项](/protocol/types)。
 
-## 后端适配器的安全基线
+## 安全基线
 
 - 对模型、字段、操作符和排序方向建立白名单。
-- 在 `page`、`save`、`delete` 每次请求中独立执行权限判断。
-- 把前端传入的 ID 当作不可信数据，并按模型主键类型转换。
-- 对 `save` 做服务端校验和审计；前端 `validate` 只改善交互。
-- 对自定义按钮 URL 做同样的认证与授权，不因按钮来自元数据而放宽权限。
-- 统一错误格式，避免返回 SQL、堆栈、凭据和内部路径。
+- `page`、`save`、`delete` 每次请求都单独做权限判断。
+- 前端传来的 ID 一律视为不可信数据，并按模型的主键类型转换。
+- `save` 要在服务端校验并记录审计日志；前端的 `validate` 只用来改善交互。
+- 自定义按钮的 URL 同样要做认证和授权，不能因为按钮来自元数据就放宽权限。
+- 统一错误格式，不要返回 SQL、堆栈、凭据和内部路径。
 
 ## 与 Rain 的关系
 
-`ako-rain` 依赖 Rain 的应用、控制器和数据访问生态。Rain 不绑定一种 HTTP 服务器或数据库，Ako 只在其上增加模型元数据与管理后台协议。需要理解扫描、启动、控制器和事务时，请参考 [Rain 框架介绍](https://rain.icecreamqaq.com/guide/introduction)、[SmartWeb](https://rain.icecreamqaq.com/smartweb/) 与 [SmartAccess](https://rain.icecreamqaq.com/smartaccess/)。
+`ako-rain` 依赖 Rain 的应用、控制器和数据访问生态。Rain 本身不绑定某种 HTTP 服务器或数据库，Ako 只是在它之上增加了模型元数据和管理后台协议。想了解扫描、启动、控制器和事务，请参考 [Rain 框架介绍](https://rain.icecreamqaq.com/guide/introduction)、[SmartWeb](https://rain.icecreamqaq.com/smartweb/) 和 [SmartAccess](https://rain.icecreamqaq.com/smartaccess/)。

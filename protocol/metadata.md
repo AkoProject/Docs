@@ -1,13 +1,13 @@
 ---
 title: 模型定义
-description: DbModel、DbField 以及前端默认页面节点的 JSON 结构。
+description: DbModel、DbField、菜单项以及默认页面节点的 JSON 结构。
 ---
 
 # 模型定义
 
-页面元数据是 Ako 前后端之间最重要的边界。后端把模型反射、注解或配置转换成 JSON；前端根据这些 JSON 决定显示什么。
+元数据是 Ako 前后端之间最核心的约定。后端通过反射、注解或配置生成 JSON，前端根据这份 JSON 决定页面上显示什么。
 
-## Model 元数据
+## 模型元数据
 
 一个模型的主要结构如下：
 
@@ -54,25 +54,25 @@ description: DbModel、DbField 以及前端默认页面节点的 JSON 结构。
 
 | 属性 | 类型 | 作用 |
 | --- | --- | --- |
-| `id` | string | 模型 API 标识，也用于前端查找模型。应保持稳定。 |
-| `name` | string | 菜单标题和页面展示名称。 |
-| `previous` | string/null | 父菜单标识。没有父级时为 `null`。 |
-| `permission` | string/null | 权限标识的传输位置；不等于后端授权。 |
-| `index` | number | 菜单或字段排序值，越小越靠前。 |
-| `displayAble` | boolean | 模型/菜单是否可显示的协议字段；实际可见性仍由适配器与前端组合决定。 |
-| `pageNode` | string | 页面根节点组件名。 |
-| `searchNode` | string | 搜索区域组件名。 |
-| `tableNode` | string | 表格组件名。 |
-| `editNode` | string | 编辑面板组件名。 |
-| `iconNode` | string | 菜单图标组件名。 |
-| `idField` | object | 当前模型的主键字段元数据；当前 JVM 响应会将它单独返回。 |
-| `fields` | array | 字段元数据。 |
+| `id` | string | 模型的 API 标识，接口路径和前端查找模型都用它，应保持稳定。 |
+| `name` | string | 菜单标题和页面上显示的名称。 |
+| `previous` | string/null | 父菜单标识，必须等于 `menus` 中某一项的 `identifier`。没有父级时为 `null`。 |
+| `permission` | string/null | 权限标识。默认前端不读取，也不能代替后端授权。 |
+| `index` | number | 在同级菜单中的排序值，越小越靠前。 |
+| `displayAble` | boolean | 默认前端不读取。后端（JVM）和后端（JavaScript）都默认输出 `false`。 |
+| `pageNode` | string | 页面根节点的组件名。 |
+| `searchNode` | string | 搜索区域的组件名。 |
+| `tableNode` | string | 表格的组件名。 |
+| `editNode` | string | 编辑面板的组件名。 |
+| `iconNode` | string | 菜单图标的组件名。 |
+| `idField` | object | 主键字段的元数据。两个后端实现都会单独输出它，默认前端不读取。 |
+| `fields` | array | 字段元数据，前端按数组顺序处理。 |
 | `modelButtons` | array | 页面级按钮。 |
 | `operateButtons` | array | 行级按钮。 |
 
-当前 JVM `DbModel` 的内部 `Class`、反射字段和映射缓存不会序列化；它们只用于后端运行时。`fields` 通常会把 `idField` 作为第一个字段再次列出，这是当前响应结构的一部分。
+后端（JVM）的 `DbModel` 中还有模型的 `Class`、反射字段和关联映射缓存，这些只在后端内部使用，不会序列化。两个后端实现都会把 `idField` 再放到 `fields` 的第一个位置，所以主键字段也会出现在搜索、表格和编辑表单中。
 
-## Field 元数据
+## 字段元数据
 
 ```json
 {
@@ -109,20 +109,20 @@ description: DbModel、DbField 以及前端默认页面节点的 JSON 结构。
 }
 ```
 
-| 属性 | 为空时的效果 |
+| 属性 | 说明 |
 | --- | --- |
-| `search` | 不在搜索表单中展示这个字段。 |
-| `column` | 不在表格中展示这个字段。 |
-| `edit` | 不在编辑表单中展示这个字段。 |
-| `type` | 决定字段的搜索、表格和编辑 TypeProvider。 |
-| `options` | 给 TypeProvider 的类型专属配置。 |
-| `description` | 默认显示在编辑项下方。 |
+| `search` | 为 `null` 时，这个字段不出现在搜索表单中。`entries` 中每一项生成一个输入框，`opt` 决定提交时的查询键。 |
+| `column` | 为 `null` 时，这个字段不出现在表格中。`width` 是列的最小宽度；`index` 决定列的顺序，可以为 `null`，此时按字段顺序排列。 |
+| `edit` | 为 `null` 时，这个字段不出现在编辑表单中。 |
+| `type` | 决定搜索、表格和编辑三处使用哪个类型提供者。 |
+| `options` | 传给类型提供者的类型专属配置，可以为 `null`。 |
+| `description` | 显示在编辑项下方的说明文字，可以为 `null`。 |
 
-这三个显示对象可以独立存在。例如只读字段通常保留 `column`，同时将 `edit` 设为 `null`；只用于过滤的字段可以保留 `search` 而隐藏 `column`。
+`search`、`column`、`edit` 三者互不影响。例如只读字段通常保留 `column`，把 `edit` 设为 `null`；只用来筛选的字段可以保留 `search`，把 `column` 设为 `null`。
 
-## 菜单元数据
+## 菜单项
 
-`menus` 中的自定义菜单项使用以下结构：
+`menus` 中的自定义菜单项结构如下：
 
 ```json
 {
@@ -140,25 +140,33 @@ description: DbModel、DbField 以及前端默认页面节点的 JSON 结构。
 }
 ```
 
-前端会通过 `findComponent` 按名称寻找节点。自定义节点必须提前注册到 Vue App，否则页面只能显示找不到组件的结果。
+默认前端读取其中的 `identifier`、`name`、`previous`、`pageNode`、`iconNode`、`index` 和 `displayAble`：
 
-## 默认渲染链
+- 如果某个菜单项的 `identifier` 被其他菜单项或模型的 `previous` 引用，它就成为菜单分组，`pageNode` 不再使用。
+- 其余菜单项是普通页面，点击后用 `pageNode` 打开一个标签页。
+- `displayAble` 决定这个标签页能否关闭。
 
-默认节点名称来自 `ako-core` 的 `AkoDefaultNode`，前端会将它们映射到 `EntityView`、搜索面板、表格面板和编辑面板。模型元数据只描述节点名，不携带 Vue 组件本身，这保证了协议不会与某个前端打包产物绑定。
+`channel`、`permission`、`searchNode`、`tableNode`、`editNode` 目前前端都不读取。后端（JVM）用 `@MenuGroup` 生成的菜单项不带 `displayAble`；后端（JavaScript）默认输出 `displayAble: true`、`index: 100`。
+
+前端通过 `findComponent` 按名称查找节点：先查内置的默认节点，再查 Vue App 中注册的全局组件。自定义节点必须提前注册，否则对应位置无法正常渲染。
+
+## 默认页面节点
+
+默认节点名在后端（JVM）中定义在 `ako-core` 的 `AkoDefaultNode`，后端（JavaScript）使用同一组名称。前端把这些名称映射到 `EntityView`、搜索面板、表格面板和编辑面板。元数据里只有节点名，不包含 Vue 组件本身，所以协议不会和某一份前端打包产物绑在一起。
 
 ## 生成元数据的建议
 
-后端适配器可以使用反射、编译期代码生成、显式 schema 或数据库描述生成元数据，但建议遵守以下规则：
+后端适配器可以用反射、编译期代码生成、显式 schema 或数据库描述来生成元数据，但最好遵守以下几条：
 
-- `id` 使用 API 稳定标识，不要随着显示名称改变。
-- 展示名称放在 `name`，不要让前端猜测字段名。
-- 不支持的场景返回 `null`，不要返回半成品对象。
-- `type` 与 `options` 必须成对设计，并在前端注册对应 TypeProvider。
-- 任何不希望暴露给浏览器的字段都不要放进 `fields` 或实体 JSON。
+- `id` 用稳定的 API 标识，不随显示名称变化。
+- 显示名称放在 `name` 里，不要让前端从字段名猜。
+- 不支持的部分返回 `null`，不要返回缺字段的对象。
+- `type` 和 `options` 要一起设计，并在前端注册对应的类型提供者。
+- 不想暴露给浏览器的属性，既不要放进 `fields`，也不要出现在实体 JSON 里。
 
-## 模型定义的详细组成
+## 延伸阅读
 
-模型定义中的两个部分有独立的详细说明：
+模型定义中有两部分单独成页：
 
-- [字段类型与选项](/protocol/types)：文本、枚举、关联、时间、大小和自定义 TypeProvider。
+- [字段类型与选项](/protocol/types)：文本、枚举、关联、时间、字节大小和自定义类型提供者。
 - [按钮与操作](/protocol/buttons)：页面级按钮、行级按钮、Dialog、Panel 和 URL 参数。
