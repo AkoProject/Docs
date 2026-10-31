@@ -4,7 +4,7 @@ layout: home
 hero:
   name: "Ako"
   text: "业务快速启动框架"
-  tagline: 后端声明业务模型，前端自动生成管理后台。
+  tagline: 后端声明业务模型，前端实时渲染管理后台，不生成一行代码。
   actions:
     - theme: brand
       text: 看看 Ako 能做什么
@@ -21,16 +21,16 @@ hero:
 
 features:
   - title: 一份模型声明
-    details: 字段、搜索、表格、表单和按钮都写在后端模型里，前端照着元数据生成页面。
-  - title: 前后端分离
-    details: 前端只认 Ako 协议。后端用什么语言、数据库和 Web 框架都可以。
-  - title: 按需替换
-    details: 页面节点、字段类型、按钮和 API 都能换成自己的实现，让页面逐步贴合业务。
+    details: 字段、搜索、表格、表单和按钮都写在后端模型里，前端在运行时按元数据渲染。改了声明，页面立刻跟着变。
+  - title: 三方各自演进
+    details: 前端、后端和框架之间只有一份协议。谁升级都不影响另外两方，后端用什么语言和框架都可以。
+  - title: 每一层都能接管
+    details: 从一个输入框、一个页面到数据来源乃至 Ako 本身，每项能力都可选、可注入、可组装、可任意替换；后端来不及改，前端还有 mixin 兜底。
 ---
 
 <figure class="ako-shot ako-shot--hero ako-home-shot">
-  <a href="/guide/showcase"><img src="/showcase/orders.png" alt="Ako 根据后端声明自动生成的订单管理页面"></a>
-  <figcaption>这一整页由一个带注解的 Kotlin 实体类生成，前端没有写页面代码。<a href="/guide/showcase">看看是怎么做到的 →</a></figcaption>
+  <a href="/guide/showcase"><img src="/showcase/orders.png" alt="Ako 按后端声明渲染的订单管理页面"></a>
+  <figcaption>这一整页由一个带注解的 Kotlin 实体类驱动，前端没有写页面代码，也没有生成任何代码。<a href="/guide/showcase">看看是怎么做到的 →</a></figcaption>
 </figure>
 
 <div class="ako-home-note">

@@ -113,13 +113,13 @@ curl -X POST http://localhost:17777/api/ako/model/page/Student \
 
 下面的截图来自实际启动的 Frontend 开发项目和 `ako-rain` 测试应用，并非静态示意图。测试模型声明了 `@MenuGroup`、`@Mapping`、`@DbEnum`、`@Description`、`@Required`、`@SearchType`、`@TableColumnWidth` 和 `@ColumnIndex`，这些注解分别体现在菜单、搜索项和表格上。
 
-![Ako 自动生成的学生管理页面](/ako-demo.png)
+![Ako 按模型元数据渲染的学生管理页面](/ako-demo.png)
 
-*实际运行效果：左侧是 `学校管理` 菜单分组，右侧的搜索表单、枚举和关联字段、分页表格和操作按钮都由模型元数据生成。*
+*实际运行效果：左侧是 `学校管理` 菜单分组，右侧的搜索表单、枚举和关联字段、分页表格和操作按钮都由模型元数据驱动。*
 
 ## 6. 接下来
 
-- [前端安装与挂载](/frontend/quick-start)：把自动生成的管理后台嵌入现有 Vue 应用。
+- [前端安装与挂载](/frontend/quick-start)：把 Ako 管理后台嵌入现有 Vue 应用。
 - [后端（JVM）项目创建](/backend/rain/project)：准备 Rain 或 Spring Boot 项目的依赖和目录。
 - [启动 JVM 后端](/backend/rain/quick-start)：完善配置和控制器，检查接口。
 - [实体模型](/backend/rain/models)：用 Rain 或 Spring 声明第一个模型。
