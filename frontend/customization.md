@@ -1,15 +1,15 @@
 ---
 title: 自定义页面与类型
-description: 注册页面节点、字段 TypeProvider、按钮组件和自定义渲染器。
+description: 注册页面节点、字段类型提供者 和按钮组件，替换默认渲染。
 ---
 
 # 自定义页面与类型
 
-Ako 的默认页面不是黑盒。后端元数据只传递字符串节点名和类型名，前端可以通过注册组件替换任意一层。
+Ako 的默认页面可以逐层替换。后端元数据里只有节点名和类型名这样的字符串，前端注册对应的组件，就能替换其中任意一层。
 
 ## 替换页面节点
 
-模型元数据中的 `pageNode`、`searchNode`、`tableNode`、`editNode` 和 `iconNode` 都会通过 `ako.findComponent(name)` 查找。先在 Vue App 注册组件：
+模型元数据中的 `pageNode`、`searchNode`、`tableNode`、`editNode` 和 `iconNode` 都通过 `ako.findComponent(name)` 查找组件。先在 Vue App 中注册组件：
 
 ```ts
 import { createApp } from 'vue'
@@ -38,11 +38,11 @@ app.mount('#app')
 }
 ```
 
-如果只想替换一个模型，推荐后端按模型输出节点，或在前端 `mixin` 中按模型 ID 修改；如果希望所有模型都改变，再替换默认节点名。
+只想替换一个模型时，推荐让后端按模型输出节点名，或者在前端 `mixin` 里按模型 ID 修改。希望所有模型都换掉时，再统一替换默认节点名。
 
-## 自定义字段 TypeProvider
+## 自定义字段类型提供者
 
-一个 TypeProvider 需要为搜索、表格、编辑提供组件，并使用与后端 `type` 完全相同的 `name`：
+一个 TypeProvider 要分别为搜索、表格、编辑提供组件，`name` 必须和后端的 `type` 完全一致：
 
 <script setup lang="ts">
 const typeExamples = [
@@ -63,7 +63,7 @@ const moneyType = {
 app.use(new Ako(), {
   types: [moneyType],
 })`,
-    note: 'name 不会自动添加 ako: 前缀；自定义类型请自行使用命名空间。',
+    note: '自定义类型的 name 不会自动加 ako: 前缀，请自己加上命名空间。',
   },
   {
     language: 'JSON',
@@ -77,44 +77,48 @@ app.use(new Ako(), {
     "precision": 2
   }
 }`,
-    note: '后端只负责输出 type 和可序列化的 options；渲染细节由前端组件决定。',
+    note: '后端只输出 type 和可序列化的 options，怎么渲染由前端组件决定。',
   },
 ]
 </script>
 
 <CodeSwitch :variants="typeExamples" />
 
+`types` 中的类型追加在内置类型之后，查找时按名称取第一个匹配项，所以用自定义类型覆盖同名的内置类型不会生效。
+
 ## 组件会收到什么
 
-默认包装器会把这些属性传给字段组件：
+默认的分发组件会把这些属性传给字段组件：
 
 | 场景 | 常用属性 |
 | --- | --- |
-| 搜索属性 | `model`、`field`、`searchData`、`entry`、`options`、`v-model` |
-| 表格列 | `model`、`field`、`row`、`data`、`page`、`information`、`options` |
-| 编辑输入 | `model`、`field`、`edit`、`data`、`page`、`options`、`v-model` |
-| 页面节点 | `model`、`page`、`searchFun`、`editFun`、`selectFun`、`viewMode` |
+| 搜索输入 | `model`、`field`、`entry`、`options`、`placeholder`、`data`（整个搜索条件对象）、`v-model` |
+| 表格单元格 | `model`、`field`、`row`、`data`、`page`、`information`、`options` |
+| 编辑输入 | `model`、`field`、`data`（正在编辑的对象）、`page`、`information`、`options`、`placeholder`、`v-model` |
+| 页面节点（`pageNode`） | `model`、`searchNode`、`tableNode`、`editNode`、`selectFun` |
 
-字段组件应该把当前值当作 `v-model`，不要直接修改只读的 `page` 或 `model` 元数据。需要刷新数据时调用页面传入的 `searchFun`。
+字段组件通过 `v-model` 读写当前值，不要直接修改只读的 `page` 或 `model` 元数据。搜索节点和表格节点会额外收到 `searchFun`、`editFun` 等函数，完整列表见 [前端参考](/frontend/reference)。
 
 ## 自定义按钮
 
-按钮有三种常用扩展方式：
+按钮怎么执行，由后端返回的按钮字段决定。最常用的是下面三种：
 
-1. 后端返回 `url`，使用通用请求按钮。
-2. 后端返回 `eval`，快速组合已有 API，但脚本在浏览器执行。
-3. 后端返回 `component`，前端注册复杂交互按钮。
+1. 返回 `url`：使用通用的请求按钮。
+2. 返回 `eval`：在浏览器里执行一段脚本，可以快速组合已有 API。
+3. 返回 `component`：前端注册一个按钮组件，实现复杂交互。
 
-自定义按钮组件通常会收到 `model`、`row`、`page`、`search` 和 `edit`。如果操作包含权限、金额、批量数据或审计要求，建议使用后端 URL，并把脚本只当作触发器。
+此外还有打开弹窗组件的 `dialog`、打开编辑面板的 `edit` 和 `panel`，字段定义见 [按钮与操作](/protocol/buttons)。
 
-## 自定义页面节点的实践建议
+页面级的按钮组件会收到 `model`、`searchData`、`single`、`multi`；行级的按钮组件会收到 `model`、`page`、`row`。两者都可以触发 `search` 事件刷新列表、触发 `edit` 事件打开编辑面板。涉及权限、金额、批量数据或审计要求的操作，建议用后端 URL 实现，脚本只用来触发。
 
-- 组件名使用命名空间，如 `sales:order-page`、`sales:money-table`。
-- 保持协议数据和组件视觉解耦；不要把 CSS class 当作后端契约。
-- 对 `options` 做运行时校验，未知版本的数据应给出可读错误。
-- 新增类型时同时写一个最小 JSON fixture 和前端组件测试。
-- 把需要后端改变的数据行为做成新 API，不要通过 `eval` 拼接 SQL 或绕过鉴权。
+## 实践建议
 
-## 前端扩展与协议扩展
+- 组件名加上命名空间，如 `sales:order-page`、`sales:money-table`。
+- 接口数据和组件样式分开，不要把 CSS class 当作和后端的约定。
+- 在运行时校验 `options`，遇到无法识别的数据要给出看得懂的错误提示。
+- 新增类型时，同时写一个最小的 JSON 示例数据和前端组件测试。
+- 需要后端改变数据行为时，做成新的 API，不要通过 `eval` 拼接 SQL 或绕过鉴权。
 
-如果一个需求只改变显示方式，优先做前端节点或 TypeProvider；如果改变查询语义、保存事务或权限模型，应先扩展后端协议，再让前端消费新字段。这样才能继续保持前后端分离。
+## 前端扩展还是协议扩展
+
+只改变显示方式的需求，优先用前端节点或类型提供者实现。要改变查询方式、保存事务或权限模型时，先扩展后端协议，再让前端读取新字段，这样前后端才能继续各自独立演进。

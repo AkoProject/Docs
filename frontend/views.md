@@ -1,25 +1,25 @@
 ---
 title: 使用 Ako View 构建页面
-description: 组合 Ako 提供的 View、面板和运行时，构建标准页、嵌入页与自定义页。
+description: 组合 Ako 提供的 View、面板和运行时，构建标准页、嵌入页和自定义页面。
 ---
 
 # 使用 Ako View 构建页面
 
-Ako 的默认管理后台由一组可以组合和替换的 Vue View 组成。你不必从空白页面重新实现菜单、分页、编辑和关联选择；可以先使用标准 View，再在需要的层级替换组件。
+Ako 默认的管理后台由一组可以组合、替换的 Vue View 组成。菜单、分页、编辑和关联选择都不必从空白页面重写：先用标准 View，再在需要的那一层替换组件。
 
-## 先选择页面入口
+## 选择入口
 
 | 目标 | 入口 |
 | --- | --- |
-| 独立运行完整管理后台 | `AkoBootView` |
-| 嵌入已有布局 | `AkoApp` + `AkoBootView` 或自己的 slot 内容 |
+| 独立运行完整的管理后台 | `AkoBootView` |
+| 嵌入已有布局 | `AkoApp` + `AkoBootView`，或在 `AkoApp` 插槽里放自己的内容 |
 | 只显示一个模型的标准页 | `Ako.createEntityView(model)` 或 `EntityView` |
 | 在弹窗中选择关联实体 | `dialog` + `Ako.createEntityView(model, selectFun)` |
-| 完全自定义业务页 | 注册自己的 View，再通过 `menuItems` 或模型节点接入 |
+| 完全自定义的业务页面 | 注册自己的 View，再通过 `menuItems` 或模型节点接入 |
 
 ## 独立运行
 
-最小入口是 `AkoBootView`：它先检查认证状态，再显示登录页或主界面。
+最简单的入口是 `AkoBootView`：它先检查登录状态，再显示登录页或主界面。
 
 ```ts
 import { createApp } from 'vue'
@@ -33,11 +33,11 @@ app.use(new Ako(), {
 app.mount('#app')
 ```
 
-`AkoBootView` 内部会使用 `AkoAuthView` 和 `AkoMainView`。这条路径适合把 Ako 作为一个独立的业务管理后台。
+`AkoBootView` 内部会用到 `AkoAuthView` 和 `AkoMainView`。想把 Ako 当作一个独立的管理后台来用，这样写就够了。
 
 ## 嵌入已有布局
 
-`AkoApp` 会把同一个 `Ako` 实例提供给内部 View。可以让它直接渲染默认启动页：
+`AkoApp` 会把传入的 `Ako` 实例提供给内部的 View。可以让它直接渲染默认的启动页：
 
 ```vue
 <script setup lang="ts">
@@ -52,7 +52,7 @@ const ako = inject(AkoSymbol)!
 </template>
 ```
 
-也可以通过 slot 包住自己的布局：
+也可以用插槽包住自己的布局：
 
 ```vue
 <template>
@@ -62,18 +62,20 @@ const ako = inject(AkoSymbol)!
 </template>
 ```
 
-外层 App 仍然要先执行：
+外层 App 要先安装插件：
 
 ```ts
 const ako = new Ako()
 app.use(ako, { baseUrl: '/api/ako/' })
 ```
 
-在自定义布局中，使用 `inject(AkoSymbol)`、`inject(AkoApiSymbol)` 取得已安装的运行时，不要在子组件内创建第二个 `Ako`。
+也可以不调用 `install`，手动给实例设置 `app` 和 `options` 后直接传给 `AkoApp`，写法见 [安装与挂载](/frontend/quick-start)。
+
+在自定义布局里，用 `inject(AkoSymbol)`、`inject(AkoApiSymbol)` 取得已有的运行时，不要在子组件里再创建一个 `Ako`。
 
 ## 标准模型页
 
-`Ako.createEntityView` 根据模型的 `pageNode` 创建页面，并把搜索、表格和编辑节点传给它：
+`Ako.createEntityView` 按模型的 `pageNode` 创建页面，并把搜索、表格和编辑节点名传进去：
 
 ```ts
 const model = ako.models.find(it => it.id === 'Student')
@@ -83,18 +85,18 @@ if (model) {
 }
 ```
 
-默认 `EntityView` 包含：
+默认的 `EntityView` 由四部分组成：
 
-1. 搜索区域：加载字段搜索组件和页面级按钮。
-2. 表格区域：加载字段列、选择状态和行级按钮。
-3. 分页器：使用 1-based page 调用 `model.page`。
-4. 编辑弹窗：调用 `createEditView` 和 `createSaveFun`。
+1. 搜索区：加载各字段的搜索组件和页面级按钮。
+2. 表格区：加载字段列、选择状态和行级按钮。
+3. 分页器：页码从 1 开始，调用 `model.page`。
+4. 编辑弹窗：通过 `createEditView` 和 `createSaveFun` 创建。
 
-模型的 `searchNode`、`tableNode`、`editNode` 可以逐模型替换；默认节点清单见 [前端参考](/frontend/reference)。
+模型的 `searchNode`、`tableNode`、`editNode` 可以按模型分别替换，默认节点列表见 [前端参考](/frontend/reference)。
 
 ## 在弹窗中选择模型
 
-关联字段的内置组件就是用这条方式打开选择页的。业务页面也可以复用：
+内置的关联字段组件就是这样打开选择页的，业务页面也可以照着用：
 
 ```ts
 import { createVNode } from 'vue'
@@ -115,11 +117,11 @@ function chooseStudent(ako, onSelected) {
 }
 ```
 
-传入 `selectFun` 后，标准页的 `viewMode` 会变成 `search`，表格行选择会回调选中的实体。它适合复用模型的查询、分页和关联信息。
+传入 `selectFun` 后，标准页的 `viewMode` 变为 `search`：表格每一行出现“选择”按钮，点击后把这一行的实体传给回调。这样可以直接复用模型的查询、分页和关联信息。
 
 ## 自定义菜单页
 
-不属于通用模型的报表、工作台和配置页面，可以通过 `menuItems` 加入主界面：
+报表、工作台、配置页这类不属于通用模型的页面，可以通过 `menuItems` 加进主界面：
 
 ```ts
 import { createVNode } from 'vue'
@@ -140,11 +142,11 @@ app.use(ako, {
 })
 ```
 
-这类页面不需要伪装成 `DbModel`，也不会自动获得 CRUD。需要模型能力时，可以在页面中注入 `AkoApiSymbol`，或者把某个模型 View 作为子内容组合进去。
+这类页面不需要伪装成 `DbModel`，但也不会自动获得增删改查。需要调用模型接口时，在页面里注入 `AkoApiSymbol`，或者把某个模型的 View 作为子内容组合进来。
 
-## 替换模型的完整页面
+## 替换模型的整个页面
 
-当一个模型需要特殊布局时，注册一个页面组件，并让后端或 `mixin` 返回它的节点名：
+某个模型需要特殊布局时，注册一个页面组件，再让后端或 `mixin` 返回它的节点名：
 
 ```ts
 app.component('sales-order-page', SalesOrderPage)
@@ -156,38 +158,42 @@ const mixin = menuRespMixin().model('Order', model => {
 app.use(new Ako(), { mixin })
 ```
 
-页面组件可以接收标准页面属性，并从注入的运行时调用接口：
+页面组件会收到 `createEntityView` 传入的属性，并通过注入的运行时调用接口：
 
 ```vue
 <script setup lang="ts">
-import { inject } from 'vue'
+import { inject, ref } from 'vue'
 import { AkoApiSymbol, AkoSymbol } from '@ako-dev/ako'
+import type { DbModel, ModelPage } from '@ako-dev/ako'
 
 const ako = inject(AkoSymbol)!
 const api = inject(AkoApiSymbol)!
 const props = defineProps<{
-  model: any
-  searchFun?: () => void
-  editFun?: (data: any, options?: any) => void
+  model: DbModel
+  searchNode: string
+  tableNode: string
+  editNode: string
+  selectFun?: (data: any) => void
 }>()
 
+const page = ref<ModelPage>()
+
 async function refresh() {
-  await api.model.page(props.model.id, {}, {}, 1, 20)
-  props.searchFun?.()
+  page.value = await api.model.page(props.model.id, {}, {}, 1, 20)
 }
 </script>
 ```
 
-页面节点不是 API 路由；它只是前端组件名称。后端仍然需要提供模型接口，组件也要自行处理加载、错误和权限失败后的交互。
+页面节点只是前端组件的名称，不是 API 路由。后端仍然要提供模型接口；组件也要自己处理加载中、出错和无权限时的交互。
 
 ## 从默认面板开始替换
 
-如果只需要替换一层，不要复制整个 `EntityView`：
+只需要换一层时，不必复制整个 `EntityView`：
 
-- 换一个字段输入：注册 TypeProvider。
-- 换一个字段外层：使用 `EditPropertyNode`、`SearchPropertyNode` 等节点名。
+- 换一个字段的输入组件：注册类型提供者。
+- 换一个字段的外层：在后端指定字段级节点名（后端（JVM）中用 `@EditPropertyNode`、`@SearchPropertyNode` 等注解）。
 - 换整张表：替换 `tableNode`。
-- 增加通用按钮：使用协议按钮或自定义按钮组件。
-- 只改一个模型：用 `mixin` 改该模型的节点。
+- 加通用按钮：使用接口定义的按钮，或自定义按钮组件。
+- 只改一个模型：用 `mixin` 修改这个模型的节点。
 
-节点和 TypeProvider 的详细 props 见 [前端参考](/frontend/reference)，实现复杂页面时再阅读 [自定义页面与类型](/frontend/customization)。
+节点和类型提供者收到的属性见 [前端参考](/frontend/reference)，实现复杂页面时再看 [自定义页面与类型](/frontend/customization)。
