@@ -120,6 +120,7 @@ export default defineConfig({
           items: [
             { text: 'Ako 能做什么', link: '/guide/showcase' },
             { text: 'Ako 是什么', link: '/guide/introduction' },
+            { text: '设计思路', link: '/guide/design' },
             { text: '快速开始', link: '/guide/quick-start' },
             { text: '整体架构', link: '/guide/architecture' },
             { text: '实现状态', link: '/guide/status' },

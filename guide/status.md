@@ -19,6 +19,7 @@ Ako 仍在持续开发。下表列出哪些部分已经能用、哪些只有协�
 | `ako-spring` | 已实现 | 已接入 Spring Boot 2/3/4 自动配置。Boot 3/4 可以用 Spring Data JPA 适配器；Boot 2 需要自己实现数据库访问。 |
 | 后端（JavaScript） | 实验性实现 | [`AkoProject/JavaScript`](https://github.com/AkoProject/JavaScript) 提供 TypeScript 核心、Node.js 和 Bun 启动适配器、Express/Fastify/Hono/Koa 接入、Prisma/Drizzle/TypeORM/Sequelize 适配器，以及内存 Repository。事务和认证由宿主应用负责。仓库自述为快速验证原型，不保证后续可用性。 |
 | 其他语言和框架 | 可按协议实现 | 暂无官方适配器，需要自己实现 HTTP 接口、元数据和数据访问。 |
+| 鉴权与多租户 | 规划中 | 用户、角色、部门、菜单等鉴权模块和多租户能力，最终覆盖认证、授权、审计完整的 AAA 能力。它们同样作为可选、可注入、可组装、可任意替换的能力提供，前后端都按协议实现。目前登录和权限由宿主应用实现 `auth` 接口负责。 |
 
 ## 推荐阅读顺序
 
