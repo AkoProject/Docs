@@ -4,7 +4,7 @@ layout: home
 hero:
   name: "Ako"
   text: "业务快速启动框架"
-  tagline: 后端声明业务模型，前端自动生成可用的管理后台。协议先于语言与框架，CRUD 页面从重复劳动变成元数据。
+  tagline: 后端声明业务模型，前端自动生成管理后台。
   actions:
     - theme: brand
       text: 立即开始
@@ -18,16 +18,16 @@ hero:
 
 features:
   - title: 一份模型声明
-    details: 字段、搜索、表格、编辑与操作按钮由后端元数据描述，前端按协议生成页面。
-  - title: 前后端真正分离
-    details: 前端只依赖 Ako 协议；后端可以使用任意语言、数据库与 Web 框架实现适配器。
-  - title: 默认能力可替换
-    details: 可以替换页面节点、字段类型、按钮和 API，让自动生成的页面逐步贴合业务。
+    details: 字段、搜索、表格、表单和按钮都写在后端模型里，前端照着元数据生成页面。
+  - title: 前后端分离
+    details: 前端只认 Ako 协议。后端用什么语言、数据库和 Web 框架都可以。
+  - title: 按需替换
+    details: 页面节点、字段类型、按钮和 API 都能换成自己的实现，让页面逐步贴合业务。
 ---
 
 <div class="ako-home-note">
 
-<span class="ako-home-note__status">当前实现</span>
-<p>Ako 当前已经打通 Vue 3 前端与 JVM 后端的 <code>ako-rain</code>、<code>ako-spring</code>，并提供 Node.js/Bun 上的 TypeScript JavaScript 后端实验实现。协议层保持独立，其他语言和框架也可以沿着同一份 HTTP 合约接入。</p>
+<span class="ako-home-note__status">实现状态</span>
+<p>前端提供 Vue 3 实现；后端（JVM）提供 <code>ako-rain</code> 和 <code>ako-spring</code> 两套实现；后端（JavaScript）是运行在 Node.js 和 Bun 上的 TypeScript 实验性实现。协议本身不绑定语言，其他语言和框架只要实现同一套 HTTP 接口就能接入。</p>
 
 </div>

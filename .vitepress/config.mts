@@ -19,11 +19,11 @@ export default defineConfig({
           text: '前端',
           link: '/frontend/quick-start',
           items: [
-            { text: '前端开始方式', link: '/frontend/quick-start' },
+            { text: '安装与挂载', link: '/frontend/quick-start' },
             { text: '前端配置', link: '/frontend/configuration' },
-            { text: '前端工具', link: '/frontend/tools' },
+            { text: '运行时与工具', link: '/frontend/tools' },
             { text: '前端参考', link: '/frontend/reference' },
-            { text: 'mixin 使用方法', link: '/frontend/mixins' },
+            { text: '使用 mixin', link: '/frontend/mixins' },
             {
               text: '使用 Ako View 构建页面',
               link: '/frontend/views',
@@ -41,7 +41,7 @@ export default defineConfig({
           items: [
             { text: '项目创建', link: '/backend/rain/project' },
             {
-              text: '开始',
+              text: '快速开始',
               link: '/backend/rain/quick-start',
               items: [
                 { text: '数据访问与事务', link: '/backend/rain/data-access' },
@@ -60,7 +60,7 @@ export default defineConfig({
           text: '后端（JavaScript）',
           link: '/backend/javascript/',
           items: [
-            { text: 'Monorepo 与 package', link: '/backend/javascript/monorepo' },
+            { text: 'Monorepo 与包结构', link: '/backend/javascript/monorepo' },
             { text: '项目创建与启动', link: '/backend/javascript/project' },
             { text: '模型与元数据', link: '/backend/javascript/models' },
             { text: 'Repository 与数据访问', link: '/backend/javascript/data-access' },
@@ -119,7 +119,7 @@ export default defineConfig({
             { text: 'Ako 是什么', link: '/guide/introduction' },
             { text: '快速开始', link: '/guide/quick-start' },
             { text: '整体架构', link: '/guide/architecture' },
-            { text: '实现状态与边界', link: '/guide/status' },
+            { text: '实现状态', link: '/guide/status' },
           ],
         },
       ],
@@ -133,11 +133,11 @@ export default defineConfig({
       ],
       '/reference/': [
         {
-          text: '兼容入口',
+          text: '参考',
           items: [
             { text: '常见问题与限制', link: '/reference/limitations' },
-            { text: 'JVM 注解索引', link: '/reference/annotations' },
-            { text: '旧版内置工具参考', link: '/reference/built-ins' },
+            { text: 'JVM 注解速查', link: '/reference/annotations' },
+            { text: '前端内置工具', link: '/reference/built-ins' },
           ],
         },
       ],

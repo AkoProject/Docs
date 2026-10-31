@@ -1,13 +1,13 @@
 ---
 title: 整体架构
-description: Ako 前后端分离、协议层和框架适配器的职责边界。
+description: Ako 的前端、协议层和后端适配器各自负责什么。
 ---
 
 # 整体架构
 
-Ako 把“页面怎么渲染”和“数据怎么保存”拆开。前端只认识协议，后端适配器把协议映射到自己的模型、数据库和 Web 框架。
+Ako 把“页面怎么渲染”和“数据怎么保存”分开处理。前端只认识协议；后端适配器把协议对应到自己的模型、数据库和 Web 框架上。
 
-## 四层关系
+## 四层结构
 
 ```text
 ┌──────────────────────────────────────────────────────────┐
@@ -31,28 +31,30 @@ Ako 把“页面怎么渲染”和“数据怎么保存”拆开。前端只认�
 └──────────────────────────────────────────────────────────┘
 ```
 
-当前 JVM 实现还可以细分为：
+后端（JVM）的模块可以再细分为：
 
-| 层 | 当前源码 | 作用 |
+| 层 | 模块 | 作用 |
 | --- | --- | --- |
 | 协议核心 | `ako-core` | 定义 `DbModel`、`DbField`、按钮、查询请求和分页响应。 |
-| JPA 基础 | `ako-jpa` | 提供 JPA 模型基类、软删除模型和查询辅助。 |
-| Rain 适配 | `ako-rain` | 在 Rain + SmartWeb + SmartAccess 环境中发现模型、注册控制器并执行查询。 |
-| Spring 适配 | `ako-spring-common`、`ako-springboot-2/3/4`、`ako-springboot-springdata` | 由 Spring Boot 自动配置建立 Runtime；Boot 3/4 可直接使用 Spring Data JPA，Boot 2 可接入公共 SPI。 |
+| JPA 基础 | `ako-jpa` | 提供 JPA 模型基类、软删除模型和查询辅助函数。 |
+| Rain 适配 | `ako-rain` | 在 Rain + SmartWeb + SmartAccess 环境中发现模型、注册控制器、执行查询。 |
+| Spring 适配 | `ako-spring-common`、`ako-springboot-2/3/4`、`ako-springboot-springdata` | 由 Spring Boot 自动配置创建 `AkoSpringRuntime`；Boot 3/4 可以直接用 Spring Data JPA，Boot 2 需要自己实现 `AkoSpringDatabase` 接口来接入数据库。 |
 
-## 一次页面请求发生什么
+后端（JavaScript）的分层见 [后端（JavaScript）](/backend/javascript/)。
 
-### 启动阶段
+## 一次页面请求的经过
 
-前端 `Ako` 插件安装默认页面节点和内置字段类型。`AkoBootView` 调用 `auth/isAuth`，认证成功后进入主界面。
+### 启动
 
-### 菜单阶段
+前端的 `Ako` 插件注册默认页面节点和内置字段类型。`AkoBootView` 调用 `auth/isAuth`，认证通过后进入主界面。
 
-主界面调用 `menu/list/{channel}`。响应中的 `models` 是后端当前可用的模型元数据，前端把它们转成菜单项和 `EntityView`。`menus` 用于补充分组或自定义页面。
+### 加载菜单
 
-### 查询阶段
+主界面调用 `menu/list/{channel}`。响应里的 `models` 是后端可用的模型元数据，前端把每个模型转成一个菜单项和对应的 `EntityView`；`menus` 用来补充菜单分组或自定义页面。
 
-`EntityView` 维护搜索条件、排序条件和分页状态，调用：
+### 查询
+
+`EntityView` 维护搜索条件、排序和分页状态，然后调用：
 
 ```text
 POST model/page/{model}
@@ -64,30 +66,33 @@ POST model/page/{model}
 }
 ```
 
-后端返回当前页实体，以及字段类型所需的 `information`。例如 `ako:mapping` 会在这里携带关联模型的展示数据。
+后端返回这一页的实体，以及字段类型需要的 `information`。例如 `ako:mapping` 会通过它带上关联模型的展示数据。
 
-### 编辑阶段
+### 编辑
 
-`edit` 不为 `null` 的字段会生成表单项；`editable: false` 会生成不可编辑输入。提交时前端把表单对象 POST 到 `model/save/{model}`，后端必须重新做权限、类型和业务校验。
+`edit` 不为 `null` 的字段会生成表单项，`editable: false` 的字段显示为不可编辑。提交时，前端把表单对象 POST 到 `model/save/{model}`。后端必须重新做权限、类型和业务校验。
 
-### 扩展阶段
+### 扩展
 
-元数据中的节点名称最终会交给 `ako.findComponent(name)`；类型名称最终会交给 `ako.findTypeProvider(type)`。因此扩展的关键是：
+元数据里的页面节点名最终交给 `ako.findComponent(name)` 查找，类型名交给 `ako.findTypeProvider(type)` 查找。所以扩展的要点只有三条：
 
 1. 后端输出稳定的字符串标识。
-2. 前端在 Vue App 中注册同名组件或 TypeProvider。
-3. 两端对 `options` 的 JSON 结构达成约定。
+2. 前端在 Vue App 中注册同名组件或类型提供者。
+3. 前后端对 `options` 的 JSON 结构达成一致。
 
-## 协议优先带来的好处
+## 以协议为中心的好处
 
-- 后端可以从 Rain 迁移到 Spring 或其他框架，而无需重写管理后台。
-- 前端可以替换默认 UI，而不改变业务接口。
-- 协议可以单独做契约测试，不必把测试绑定到某一个 ORM。
-- 复杂业务可以保留手写页面，标准模型页面继续使用自动生成。
+- 后端从 Rain 迁到 Spring 或其他框架，管理后台不用重写。
+- 前端可以换掉默认 UI，业务接口保持不变。
+- 协议可以单独做契约测试，测试不必绑定某个 ORM。
+- 复杂业务保留手写页面，标准模型页面继续自动生成。
 
-## 设计时要守住的边界
+## 设计时需要注意
 
-- 元数据是输入，不是权限系统。`permission`、`Scene` 等字段不能替代后端授权判断。
-- `FunctionValidate`、`FetchValidate` 和按钮 `eval` 运行在浏览器中，不能承载机密或最终业务规则。
-- 查询操作符来自客户端，适配器应该白名单校验字段、操作符和排序方向。
-- 只要后端使用不同的主键类型，删除接口仍应接受字符串化 ID，避免 UUID 或大整数在前端丢失精度。
+元数据只是渲染页面的输入，不承担权限控制。`permission`、`Scene` 这类字段替代不了后端的授权判断。
+
+`FunctionValidate`、`FetchValidate` 和按钮 `eval` 都在浏览器里运行，不要把机密信息或最终的业务规则放在里面。
+
+查询操作符和排序方向来自客户端，适配器应当用白名单校验字段、操作符和排序方向。
+
+主键类型各不相同，删除接口应接受字符串形式的 ID，以免 UUID 或大整数在前端丢失精度。
