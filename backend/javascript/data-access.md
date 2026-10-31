@@ -1,13 +1,13 @@
 ---
 title: Repository 与数据访问
-description: 将 Ako JavaScript 后端接入 Prisma、Drizzle、TypeORM、SQL 或其他数据访问实现。
+description: 把 Ako JavaScript 后端接到 Prisma、Drizzle、TypeORM、SQL 或其他数据访问实现上。
 ---
 
 # Repository 与数据访问
 
-Ako JavaScript 不内置 ORM。`AkoRepository` 是一个很小的适配边界：它接收已经通过 Ako 白名单解析的查询计划，返回分页实体，并负责保存、删除和关联列表查询。
+Ako JavaScript 不内置 ORM，数据访问统一通过 `AkoRepository` 这个很小的接口完成。它接收已经按字段白名单校验过的查询条件，返回分页数据，并负责保存、删除和关联数据的列表查询。
 
-## Repository 合约
+## Repository 接口
 
 ```ts
 interface AkoRepository<TEntity extends object, TId> {
@@ -21,7 +21,7 @@ interface AkoRepository<TEntity extends object, TId> {
 }
 ```
 
-也可以用 `createRepository` 包装同步 callback：
+也可以用 `createRepository` 来创建。传给它的回调既可以是异步函数，也可以是同步函数：
 
 ```ts
 const studentRepository = createRepository<Student, number>({
@@ -40,11 +40,11 @@ const studentRepository = createRepository<Student, number>({
 })
 ```
 
-repository 不需要知道 HTTP 路径，也不应直接读取浏览器的原始查询对象。这样可以把 Express/Fastify 的请求绑定、Ako 的查询白名单和 ORM 的查询语句分开测试。
+Repository 不关心 HTTP 路径，也不应该直接读取浏览器传来的原始查询对象。这样，Express、Fastify 的请求绑定，Ako 的字段白名单校验，以及 ORM 查询语句，三者可以分开测试。
 
 ## 查询计划
 
-前端请求中的：
+前端发来的请求体：
 
 ```json
 {
@@ -61,7 +61,7 @@ repository 不需要知道 HTTP 路径，也不应直接读取浏览器的原始
 }
 ```
 
-会被转换成 ORM 无关的结构：
+会被转换成与 ORM 无关的结构：
 
 ```ts
 {
@@ -78,23 +78,23 @@ repository 不需要知道 HTTP 路径，也不应直接读取浏览器的原始
 }
 ```
 
-支持的操作符与协议一致：
+支持的操作符与接口规范一致：
 
-| 操作符 | 含义 | repository 注意事项 |
+| 操作符 | 含义 | 实现 Repository 时注意 |
 | --- | --- | --- |
-| `eq` | 等于 | 直接映射到 ORM 的等值条件。 |
-| `like` | 模糊匹配 | 前端通常已将输入包装成 `%...%`。 |
-| `gt`/`gte` | 大于/大于等于 | 根据字段类型转换数值或时间。 |
+| `eq` | 等于 | 直接对应 ORM 的等值条件。 |
+| `like` | 模糊匹配 | 前端会先把输入包成 `%...%`。 |
+| `gt`/`gte` | 大于/大于等于 | 按字段类型转换为数值或时间。 |
 | `lt`/`lte` | 小于/小于等于 | 注意时区和边界精度。 |
-| `ne` | 不等于 | 需要明确数据库对 `NULL` 的语义。 |
-| `in` | 在集合中 | 只接受白名单字段和集合值。 |
-| `isNull` | 是否为空 | 本实现中 `true` 表示为空，`false` 表示非空。 |
+| `ne` | 不等于 | 要想清楚数据库对 `NULL` 怎么处理。 |
+| `in` | 属于集合 | 只接受白名单字段和集合值。 |
+| `isNull` | 是否为空 | `true` 表示为空，`false` 表示不为空。 |
 
-`page` 始终是 1-based；repository 可以在内部转换为 ORM 的 offset 或 zero-based page。没有传 `sort` 时，runtime 会按模型主键升序排序，便于页面首次加载稳定复现。
+`page` 从 1 开始计数，Repository 可以在内部换算成 ORM 需要的 offset 或从 0 开始的页码。请求没有传 `sort` 时，运行时会按模型主键升序排序，保证页面首次加载的顺序稳定。
 
-## Prisma/Drizzle 等 ORM 的适配思路
+## 对接 ORM
 
-不要把客户端传入的 `field`、`operator` 或排序方向直接拼接到 SQL。先建立字段白名单，再把 canonical query 映射到 ORM：
+客户端传来的 `field`、`operator` 和排序方向，绝不能直接拼进 SQL。应该先建立字段白名单，再把查询计划转换成 ORM 的查询：
 
 ```ts
 const studentRepository = createRepository<Student, number>({
@@ -129,11 +129,11 @@ const studentRepository = createRepository<Student, number>({
 })
 ```
 
-上例中的 `toStudentWhere` 和 `toStudentOrderBy` 应由业务 adapter 自己实现。Prisma、Drizzle、TypeORM 和 SQL builder 的空值、模糊匹配、大小写和日期行为不完全相同，不能由 Ako 核心替 ORM 做假设。
+上例中的 `toStudentWhere` 和 `toStudentOrderBy` 需要业务代码自己实现。Prisma、Drizzle、TypeORM 和各种 SQL 构建器在空值、模糊匹配、大小写和日期上的行为各不相同，Ako 核心无法替 ORM 做这些假设。
 
 ## 字段值转换
 
-如果 ORM 需要把 JSON 字符串转成数字、UUID、日期或其他值，可以在字段上提供 `parseQueryValue`：
+如果 ORM 需要把 JSON 中的字符串转成数字、UUID、日期或其他类型，可以给字段提供 `parseQueryValue`：
 
 ```ts
 defineField<Student>({
@@ -152,11 +152,11 @@ defineField<Student>({
 })
 ```
 
-转换失败会被 handler 转成 `400 bad_request`。repository 收到的已经是转换后的值，但仍应执行自己的领域校验。
+分页查询时，转换抛出的异常会变成 `400 bad_request` 响应。Repository 拿到的已经是转换后的值，但仍要做自己的领域校验。
 
 ## 关联信息查询
 
-`mappingField` 会在当前页实体中收集关联 ID，并调用目标模型的 `repository.list`：
+`mappingField` 会收集当前页实体中的关联 ID，然后调用目标模型 Repository 的 `list`：
 
 ```ts
 const groupRepository = createRepository<Group, number>({
@@ -175,13 +175,13 @@ const groupRepository = createRepository<Group, number>({
 })
 ```
 
-`list` 的过滤条件是目标字段的 `in`，数量上限是当前页中实际出现的关联 ID 数量。目标模型的 `authorize` 也会被检查；没有权限读取的关联模型不会被塞进 `information`。
+传给 `list` 的过滤条件是目标字段的 `in`，`limit` 等于当前页里实际出现的不同关联 ID 的数量。运行时同样会检查目标模型的 `authorize`，没有读取权限的关联模型不会写进 `information`。
 
-如果一个模型不需要关联字段，`list` 仍然是合约的一部分，以便同一套 repository 类型可以被任意模型复用。
+即使某个模型用不到关联字段，也要实现 `list`。它是接口的一部分，这样同一种 Repository 类型才能给任意模型复用。
 
 ## 保存、删除与 ID
 
-`save` 接收一个 JSON 对象。新增还是更新、字段允许列表、唯一性、业务状态转换和审计，应由 repository 或领域服务决定：
+`save` 接收一个 JSON 对象。是新增还是更新、允许写哪些字段、唯一性约束、业务状态流转和审计，都由 Repository 或领域服务决定。需要在保存前做校验时，可以用 `beforeSave`：
 
 ```ts
 const model = defineModel({
@@ -197,7 +197,7 @@ const model = defineModel({
 })
 ```
 
-删除请求中的 ID 默认按 JSON 值传递；UUID、`bigint` 或 ORM 专用类型可以用 `parseId` 转换：
+删除请求中的 ID 默认按 JSON 原值传递。UUID、`bigint` 或 ORM 专用的 ID 类型可以用 `parseId` 转换：
 
 ```ts
 const accountModel = defineModel<Account, bigint>({
@@ -209,20 +209,20 @@ const accountModel = defineModel<Account, bigint>({
 })
 ```
 
-协议响应中的 `bigint` 会序列化为十进制字符串，避免前端 `number` 精度不足。数据库端仍然必须检查 ID 是否属于当前用户、租户或授权范围。
+`parseId` 抛出异常时，请求会以 `400` 结束。响应中的 `bigint` 会序列化为十进制字符串，避免前端 `number` 丢失精度。但服务端仍要检查这些 ID 是否属于当前用户、租户或授权范围。
 
 ## 事务、软删除和并发
 
-Ako runtime 不包裹事务，因为不同 ORM 和宿主框架的事务模型不同。推荐由 repository 或应用 service 保证一次操作的边界：
+不同 ORM 和宿主框架的事务模型差别很大，所以 Ako 的运行时不负责开启事务。一次操作的事务范围应由 Repository 或应用服务保证：
 
-- `page` 的 count 与 entities 查询是否需要同一事务，由数据库和业务一致性要求决定。
-- `save` 的校验、唯一索引、审计和事件发布应在同一业务事务中协调。
-- `delete` 如果实现软删除，应在 repository 内更新删除标记，并让 `page`/`list` 默认排除已删除行。
-- 对批量删除要限制数量、检查每个 ID 的权限，并根据 ORM 的事务能力决定原子性。
+- `page` 中的计数和数据查询是否放在同一事务里，取决于数据库和业务对一致性的要求。
+- `save` 的校验、唯一索引、审计和事件发布，应在同一个业务事务中协调。
+- `delete` 如果做成软删除，应在 Repository 中更新删除标记，并让 `page`、`list` 默认排除已删除的行。
+- 批量删除要限制数量、逐个检查 ID 的权限，并根据 ORM 的事务能力决定是否保证原子性。
 
-## 内存 repository
+## 内存 Repository
 
-原型或协议测试可以使用：
+做原型或测试接口时可以用：
 
 ```ts
 const repository = createMemoryRepository<Student, number>(
@@ -234,4 +234,4 @@ const repository = createMemoryRepository<Student, number>(
 )
 ```
 
-它支持过滤、排序、分页、保存和删除，但不提供事务、并发控制或持久化能力。不要把它当作生产数据库替代品。
+它支持过滤、排序、分页、保存和删除，但没有事务、并发控制和持久化，不能代替生产数据库。

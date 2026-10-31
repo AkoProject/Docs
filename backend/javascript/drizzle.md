@@ -1,13 +1,13 @@
 ---
 title: Drizzle 接入
-description: 使用 Drizzle 的列、operators 和 query builder callback 接入 Ako JavaScript。
+description: 通过注入 Drizzle 的列、操作符函数和查询回调创建 Ako Repository。
 ---
 
 # Drizzle 接入
 
-Drizzle 的列对象、SQL expression 和查询 builder 会随数据库方言变化。Ako 的 `createDrizzleRepository` 不猜测这些细节，而是注入 `columns`、`operators`、`select`、`count`、`save` 和 `delete`。
+Drizzle 的列对象、SQL 表达式和查询 builder 随数据库方言而变。`@ako-dev/ako-js-drizzle` 提供的 `createDrizzleRepository` 不去猜这些细节，而是由应用注入 `columns`、`operators` 以及 `select`、`count`、`save`、`delete` 四个回调。适配器不导入 `drizzle-orm`，支持 0.30 及以上版本。
 
-## 安装与列映射
+## 安装与创建 Repository
 
 ```bash
 yarn add drizzle-orm
@@ -59,11 +59,24 @@ const repository = createDrizzleRepository<Student, number>({
 })
 ```
 
-`columns` 是 Ako field ID 到 Drizzle column 的白名单。没有注册的字段不会进入查询表达式。
+`columns` 是 Ako 字段 ID 到 Drizzle 列的白名单。过滤或排序用到了没有注册的字段时，适配器会直接抛出错误。
+
+## 选项
+
+| 选项 | 默认值 | 说明 |
+| --- | --- | --- |
+| `columns` | 必填 | Ako 字段 ID 到 Drizzle 列的映射 |
+| `operators` | 必填 | 从 `drizzle-orm` 导入的 `eq`、`like`、`gt`、`gte`、`lt`、`lte`、`ne`、`inArray`、`isNull`、`isNotNull`、`and`、`asc`、`desc` |
+| `select` | 必填 | `({ where, orderBy, limit, offset }) => rows`，执行查询 |
+| `count` | 必填 | `(where) => number`，统计总数 |
+| `save` | 必填 | `(data) => ...`，新增或更新 |
+| `delete` | 必填 | `(ids) => ...`，批量删除 |
+| `toWhere` | 默认转换 | `(filters, columns, operators) => where`，自定义过滤条件 |
+| `toOrderBy` | 默认转换 | `(sort, columns, operators) => orderBy[]`，自定义排序 |
 
 ## 实现 select 与 count
 
-`select` callback 负责把 Ako 的 `where`、`orderBy`、`limit` 和 `offset` 接到 Drizzle builder：
+`select` 回调负责把 Ako 生成的 `where`、`orderBy`、`limit` 和 `offset` 交给 Drizzle builder：
 
 ```ts
 async function selectStudents({ where, orderBy, limit, offset }) {
@@ -83,28 +96,30 @@ async function countStudents(where) {
 }
 ```
 
-实际项目中 `sql`、返回值类型和 builder 的泛型会由 Drizzle dialect 决定；adapter 不强行把它们抹平。
+没有过滤条件时 `where` 为 `undefined`。解析关联字段（mapping）的显示值时，适配器也会调用 `select`，这时不传 `offset`。`sql` 的写法、返回值类型和 builder 泛型都由 Drizzle 方言决定，适配器不强行统一。
 
-## 查询表达式
+## 查询转换
 
-默认转换为：
+默认转换规则如下：
 
-| Ako | Drizzle operator |
+| Ako | Drizzle 操作符 |
 | --- | --- |
 | `eq` | `eq(column, value)` |
 | `like` | `like(column, value)` |
-| `gt`/`gte`/`lt`/`lte` | 对应比较函数 |
+| `gt`/`gte`/`lt`/`lte` | 对应的比较函数 |
 | `ne` | `ne(column, value)` |
 | `in` | `inArray(column, values)` |
 | `isNull` | `isNull`/`isNotNull` |
 | sort | `asc`/`desc` |
 | page | `limit` + `offset` |
 
-Drizzle 官方的 select API 同时提供 `limit`、`offset` 和 `orderBy`；Ako 默认排序会带上主键，避免分页没有稳定顺序。
+多个过滤条件用 `and` 组合。默认转换由包中导出的 `toDrizzleWhere` 和 `toDrizzleOrderBy` 完成，自定义时可以复用。
 
-## 自定义过滤与关系查询
+Drizzle 的 select API 提供 `limit`、`offset` 和 `orderBy`。请求没有指定排序时，Ako 会按主键升序排序，保证分页顺序稳定。
 
-对于关联查询、租户条件、软删除或 PostgreSQL 特有表达式，使用 `toWhere` 和 `toOrderBy`：
+## 自定义过滤与关联查询
+
+关联查询、租户条件、软删除或 PostgreSQL 特有的表达式，用 `toWhere` 和 `toOrderBy` 处理：
 
 ```ts
 const repository = createDrizzleRepository({
@@ -122,11 +137,11 @@ const repository = createDrizzleRepository({
 })
 ```
 
-用户输入只能作为 expression 的值传给 Drizzle，不能拼接为 `sql` 字符串。TypeORM 官方文档也对 raw query 的用户输入给出了同样的参数绑定安全要求。
+用户输入只能作为表达式的值传给 Drizzle，不能拼进 `sql` 字符串。
 
 ## 保存与删除
 
-Drizzle 的 insert/update/delete 写法依赖表定义和数据库 dialect，建议封装在 callback：
+Drizzle 的 insert、update、delete 写法依赖表定义和数据库方言，所以由回调实现：
 
 ```ts
 async function saveStudent(data) {
@@ -144,9 +159,9 @@ async function deleteStudents(ids) {
 }
 ```
 
-如果数据库使用事务、软删除或审计字段，在这些 callback 中统一处理；不要在通用 Ako handler 中依赖某个 dialect 的事务 API。
+事务、软删除和审计字段都在这些回调里统一处理，不要让通用的 Ako 请求处理函数依赖某个方言的事务 API。
 
-## 进一步阅读
+## 延伸阅读
 
 - [适配器总览](/backend/javascript/adapters)
 - [Repository 与数据访问](/backend/javascript/data-access)

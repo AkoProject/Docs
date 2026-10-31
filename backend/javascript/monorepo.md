@@ -1,11 +1,11 @@
 ---
-title: Monorepo 与 package
-description: Ako JavaScript Monorepo 的 workspace 结构、依赖边界和单包构建方式。
+title: Monorepo 与包结构
+description: Ako JavaScript 仓库的 workspace 结构、包之间的依赖关系和单包构建方式。
 ---
 
-# Monorepo 与 package
+# Monorepo 与包结构
 
-JavaScript 侧在独立仓库 [`AkoProject/JavaScript`](https://github.com/AkoProject/JavaScript) 中采用 Yarn Monorepo，把协议核心与各个适配器拆为独立 package。用户只安装自己使用的 Web 框架、ORM 和对应 Ako adapter，避免一个集成包把其他生态带入应用。
+JavaScript 版放在独立仓库 [`AkoProject/JavaScript`](https://github.com/AkoProject/JavaScript) 中，用 Yarn workspaces 管理。核心包和各个适配器拆成独立的包，应用只需安装自己用到的 Web 框架、ORM 和对应的 Ako 适配器，不会因为一个大而全的集成包把其他生态也带进来。
 
 ## Workspace 结构
 
@@ -24,7 +24,7 @@ JavaScript/
 │   ├── drizzle/    @ako-dev/ako-js-drizzle
 │   ├── typeorm/    @ako-dev/ako-js-typeorm
 │   └── sequelize/  @ako-dev/ako-js-sequelize
-├── test/
+├── tsconfig.base.json
 └── package.json
 ```
 
@@ -45,11 +45,11 @@ JavaScript/
 └── @ako-dev/ako-js-sequelize
 ```
 
-Web 框架和 ORM 都是对应 adapter 的可选 peer dependency。core 不导入 Node、Express、Fastify、数据库驱动或 ORM；Fetch 风格的 Hono/Bun 也不会因为使用 core 而得到 Node bridge。
+Web 框架和 ORM 都声明为对应适配器的可选 peer dependency。核心包不导入 Node、Express、Fastify、数据库驱动或 ORM。Hono 和 Bun 走 Fetch 风格的接口，只依赖核心包，不会顺带引入 Node 桥接。
 
-## 应用项目的安装方式
+## 在应用中安装
 
-按实际技术栈安装：
+按实际技术栈选择：
 
 ```bash
 # Express + Sequelize
@@ -62,7 +62,7 @@ yarn add @ako-dev/ako-js @ako-dev/ako-js-fastify @ako-dev/ako-js-prisma fastify 
 bun add @ako-dev/ako-js @ako-dev/ako-js-hono @ako-dev/ako-js-drizzle @ako-dev/ako-js-bun hono drizzle-orm
 ```
 
-业务项目从独立入口导入：
+业务代码从各包的入口导入：
 
 ```ts
 import { AkoRuntime, createAkoHandler } from '@ako-dev/ako-js'
@@ -70,11 +70,11 @@ import { createFastifyHandler } from '@ako-dev/ako-js-fastify'
 import { createPrismaRepository } from '@ako-dev/ako-js-prisma'
 ```
 
-不要从 Monorepo 相对路径导入 `modules/*/src`；发布后应用只依赖 package 的 `exports` 和声明文件。
+请始终按包名导入，不要用相对路径引用 `modules/*/src`。发布后，应用只能依赖各包 `exports` 中声明的入口和类型声明文件。
 
-## 本地开发命令
+## 本地开发
 
-克隆 JavaScript 仓库后，在仓库根目录执行：
+克隆仓库后，在根目录执行：
 
 ```bash
 yarn install
@@ -83,7 +83,7 @@ yarn build
 yarn test
 ```
 
-根 `build` 会先构建 `@ako-dev/ako-js`，再按依赖顺序构建所有 adapter。可以只构建或检查一个包：
+根目录的 `build` 会先构建 `@ako-dev/ako-js`，再按依赖顺序构建其余适配器。也可以只构建或检查某一个包：
 
 ```bash
 yarn workspace @ako-dev/ako-js build
@@ -91,7 +91,7 @@ yarn workspace @ako-dev/ako-js-sequelize typecheck
 yarn workspace @ako-dev/ako-js-express build
 ```
 
-每个 package 都有独立的 `test/` 和 `test` script，可以单独运行：
+每个包都有自己的 `test/` 目录和 `test` 脚本，可以单独运行：
 
 ```bash
 yarn workspace @ako-dev/ako-js test
@@ -99,22 +99,22 @@ yarn workspace @ako-dev/ako-js-memory test
 yarn workspace @ako-dev/ako-js-sequelize test
 ```
 
-根 `yarn test` 只负责按依赖顺序汇总调用这些独立测试，不再维护一个集中的根测试目录。测试从 workspace package 名称或包自己的入口导入，确保解析方式与用户安装发布包后的方式一致。
+根目录的 `yarn test` 只是按依赖顺序依次调用这些测试，仓库根部没有集中的测试目录。测试代码通过 workspace 包名或包自身的入口导入，模块解析方式和用户安装发布包后一致。
 
-## 发布边界
+## 发布
 
-每个 package 都有自己的 `package.json`、`exports`、版本号和依赖声明，可以独立发布。发布时应保持同一版本线，并先发布 core 或确保各 adapter 的 core 依赖版本已经存在。
+每个包都有自己的 `package.json`、`exports`、版本号和依赖声明，可以单独发布。目前所有包的版本都是 `0.0.0-dev.1`。发布时应保持同一版本线，并先发布核心包，或者确认各适配器依赖的核心包版本已经存在。
 
-应用如果只使用 `@ako-dev/ako-js-sequelize`，仍然需要显式安装 `@ako-dev/ako-js`，因为 adapter 的 core 依赖属于协议运行时；但不需要安装 Prisma、Drizzle、TypeORM 或其他 Web adapter。
+即使应用只用 `@ako-dev/ako-js-sequelize`，也要显式安装 `@ako-dev/ako-js`，因为接口逻辑和运行时都在核心包里。但不需要安装 Prisma、Drizzle、TypeORM 或其他 Web 适配器。
 
 ## 为什么不做一个全量包
 
-Node.js Web 框架和 ORM 的版本、运行时、打包方式和 peer 依赖差异很大。拆包可以让：
+Node.js 生态里的 Web 框架和 ORM 在版本、运行环境、打包方式和 peer 依赖上差别很大。拆包之后：
 
-- Fetch runtime 不携带 `node:http` 类型和实现。
-- Express/Fastify/Koa 共享 Node bridge，但不互相依赖。
-- Prisma/Drizzle/TypeORM/Sequelize 的适配器可以独立演进。
-- 用户在升级某个 ORM adapter 时，不会无意升级整个 Ako 生态。
-- 自定义 ORM 只需要依赖 core，实现自己的 `AkoRepository`。
+- Fetch 风格的运行环境不会带上 `node:http` 的类型和实现。
+- Express、Fastify、Koa 共用 Node 桥接，但彼此不依赖。
+- Prisma、Drizzle、TypeORM、Sequelize 的适配器可以各自演进。
+- 升级某个 ORM 适配器时，不会连带升级整个 Ako 生态。
+- 自定义 ORM 只需依赖核心包，自己实现 `AkoRepository`。
 
-各 package 的使用方式见 [适配器总览](/backend/javascript/adapters)，具体框架页面在左侧以一级入口列出。
+各包的用法见 [适配器总览](/backend/javascript/adapters)，具体框架的接入指南在左侧导航中列出。

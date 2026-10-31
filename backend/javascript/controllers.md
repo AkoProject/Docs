@@ -1,21 +1,21 @@
 ---
 title: Web 框架、鉴权与安全
-description: 将 Ako JavaScript handler 接入 Node/Bun Web 应用，并配置认证、授权、错误和安全边界。
+description: 把 Ako JavaScript 的请求处理函数接入 Node 或 Bun 上的 Web 应用，并配置认证、授权、错误处理和安全措施。
 ---
 
 # Web 框架、鉴权与安全
 
-Ako JavaScript 把 Web 层收敛为一个函数：
+Ako JavaScript 把整个 Web 层归结为一个函数：
 
 ```ts
 type AkoHandler = (request: Request) => Promise<Response>
 ```
 
-因此核心不拥有端口、路由表、session 或中间件。宿主应用决定请求如何进入 handler，handler 再把 Ako 协议响应交回宿主。
+所以核心包不管端口、路由表、session 和中间件。请求怎样进入请求处理函数由宿主应用决定，处理完后再把 Ako 的响应交还给宿主。
 
 ## Node `http`
 
-Node adapter 封装 `IncomingMessage` 和 `ServerResponse` 的差异：
+Node 适配器负责在 `IncomingMessage`、`ServerResponse` 和 Web 标准对象之间转换：
 
 ```ts
 import { createNodeServer } from '@ako-dev/ako-js-node'
@@ -27,7 +27,7 @@ const server = createNodeServer(handler, {
 server.listen(3000)
 ```
 
-核心 runtime 也有同样的 `maxBodyBytes` 限制。若修改了 runtime 的限制，Node adapter 应传入相同值：
+运行时本身也有一个 `maxBodyBytes` 限制，两者默认都是 1 MiB。如果改了运行时的限制，Node 适配器也要传入相同的值：
 
 ```ts
 const maxBodyBytes = 4 * 1024 * 1024
@@ -40,11 +40,11 @@ const server = createNodeServer(createAkoHandler(runtime), {
 })
 ```
 
-Node adapter 会读取请求体、构造 Web `Request`，再将 Web `Response` 的状态码、headers 和 body 写回 Node 响应。`node:http` 只出现在这个 adapter 中，模型和 repository 不需要导入 Node 模块。
+Node 适配器读取请求体，构造出 Web `Request`，再把 Web `Response` 的状态码、响应头和响应体写回 Node 响应。只有这个适配器会用到 `node:http`，模型和 Repository 都不需要导入 Node 模块。
 
 ## Bun
 
-Bun 原生使用 Fetch handler：
+Bun 原生使用 Fetch 风格的请求处理函数：
 
 ```ts
 import { serveWithBun } from '@ako-dev/ako-js-bun'
@@ -55,13 +55,13 @@ serveWithBun(handler, {
 })
 ```
 
-Bun adapter 通过 `globalThis.Bun` 延迟获取运行时，不把 Bun 类型或模块导入核心构建产物。Node 项目可以安全地保留这个 import，只要不在 Node 中调用 `serveWithBun`。
+Bun 适配器在调用时才通过 `globalThis.Bun` 获取 Bun 运行时，不会把 Bun 的类型或模块带进核心包的构建产物。Node 项目保留这个 import 也没问题，只要不在 Node 中调用 `serveWithBun`。
 
-Express、Fastify、Hono、Koa 和 Nest 的接入方式见 [适配器总览](/backend/javascript/adapters)。Nest 通常复用它底层使用的 Express 或 Fastify adapter；Hono 则可以直接返回 Ako handler 的 `Response`。
+Express、Fastify、Hono、Koa 和 Nest 的接入方式见 [适配器总览](/backend/javascript/adapters)。Nest 通常直接复用它底层的 Express 或 Fastify 适配器；Hono 则可以直接返回 Ako 请求处理函数生成的 `Response`。
 
-## 认证边界
+## 认证
 
-`auth` 是宿主应用提供的认证边界：
+认证逻辑由宿主应用通过 `auth` 提供：
 
 ```ts
 const runtime = new AkoRuntime({
@@ -74,19 +74,19 @@ const runtime = new AkoRuntime({
             if (data.username !== 'demo' || data.password !== 'demo') {
                 throw unauthorized('用户名或密码错误')
             }
-            // 真实应用在这里交给宿主框架创建 session 或 token。
+            // 真实应用应在这里交由宿主框架创建 session 或 token。
         },
     },
 })
 ```
 
-`auth/isAuth` 会返回布尔值；`menu`、`page`、`save`、`delete` 在认证失败时返回 `401`。Ako 不保存登录状态，也不会猜测 cookie、JWT 或 OAuth 的格式。
+`auth/isAuth` 返回一个布尔值。`menu`、`page`、`save`、`delete` 在未通过认证时返回 `401`。`login` 没有返回值时响应 `204`，有返回值时把它作为 JSON 返回。Ako 不保存登录状态，也不会去猜 cookie、JWT 或 OAuth 的格式。
 
-如果认证已经由 Express/Fastify/Nest 中间件完成，`isAuthenticated` 可以读取请求头或宿主附加的上下文。需要把用户对象传给 repository 时，建议通过闭包、请求上下文 adapter 或宿主框架的 request-local storage 实现，而不是把用户信息写进前端请求体。
+如果 Express、Fastify 或 Nest 的中间件已经完成了认证，`isAuthenticated` 只需读取请求头或宿主附加的上下文。要把用户对象传给 Repository，可以用闭包、按请求创建的上下文，或宿主框架提供的请求级存储（request-local storage）。用户信息不要放进前端的请求体。
 
 ## 模型授权
 
-每个模型都可以声明 `authorize`。它会在菜单、分页、保存和删除动作中分别执行：
+每个模型都可以声明 `authorize`，菜单、分页、保存、删除这四种操作都会调用它：
 
 ```ts
 const studentModel = defineModel<Student, number>({
@@ -107,11 +107,11 @@ const studentModel = defineModel<Student, number>({
 })
 ```
 
-返回 `false` 会产生 `403`。菜单会过滤掉不可访问模型；分页、保存和删除会直接拒绝。授权钩子只解决“是否可以执行 Ako 动作”，行级、租户级和字段级权限仍应在 repository/领域服务中再次检查。
+返回 `false` 时请求得到 `403`。抛出 `status` 为 `401` 或 `403` 的错误，效果和返回 `false` 相同。菜单接口会把无权访问的模型过滤掉；分页、保存和删除则直接拒绝请求。`authorize` 只判断能否执行某个 Ako 操作，行级、租户级和字段级的权限仍要在 Repository 或领域服务里再检查一遍。
 
-## 协议错误
+## 错误响应
 
-核心错误响应使用统一形状：
+核心包的错误响应格式统一如下：
 
 ```json
 {
@@ -126,15 +126,15 @@ const studentModel = defineModel<Student, number>({
 
 | 状态码 | 场景 |
 | --- | --- |
-| `400` | JSON、分页、字段、操作符、排序或 ID 无效。 |
+| `400` | JSON、分页参数、字段、操作符、排序或 ID 无效。 |
 | `401` | `auth.isAuthenticated` 返回 `false`。 |
-| `403` | 模型 `authorize` 拒绝当前动作。 |
+| `403` | 模型的 `authorize` 拒绝了当前操作。 |
 | `404` | 路由、模型或关联目标不存在。 |
-| `405` | 路径存在但 HTTP 方法不匹配。 |
+| `405` | 路径存在，但 HTTP 方法不对。 |
 | `413` | 请求体超过 `maxBodyBytes`。 |
-| `500` | repository 或业务代码出现未处理异常。 |
+| `500` | Repository 或业务代码抛出了未处理的异常。 |
 
-未知异常默认只返回 `Internal server error`，不会把堆栈、SQL、数据库路径或凭据返回浏览器。可以通过 `onError` 接入宿主日志和错误上报：
+对于未知异常，默认只返回 `Internal server error`，不会把堆栈、SQL、数据库路径或凭据暴露给浏览器。`onError` 可以用来接入宿主应用的日志和错误上报。它只处理 `AkoError` 以外的异常，上表中的 4xx 错误不会经过它：
 
 ```ts
 const runtime = new AkoRuntime({
@@ -154,19 +154,19 @@ const runtime = new AkoRuntime({
 
 ## 安全检查清单
 
-接入生产应用前至少确认：
+上线到生产环境前，至少确认以下几点：
 
-- `expose: false` 的内部模型不会出现在菜单，也不能通过模型路由访问。
-- `serializeEntity` 不会返回密码、密钥、内部租户信息或数据库对象。
-- repository 对模型、字段、操作符、排序方向和 ID 建立白名单。
-- `page`、`save`、`delete` 都执行逐请求认证和授权，不只依赖菜单隐藏。
-- `save` 重新执行服务端校验，不把 `edit.validate` 当作业务规则。
-- `delete` 限制批量数量，检查每个 ID 的权限，并正确处理软删除。
+- `expose: false` 的内部模型不出现在菜单中，也无法通过模型路由访问。
+- `serializeEntity` 不会返回密码、密钥、租户内部信息或数据库对象。
+- Repository 对模型、字段、操作符、排序方向和 ID 都有白名单。
+- `page`、`save`、`delete` 每个请求都做认证和授权，而不只是在菜单里隐藏入口。
+- `save` 在服务端重新校验数据，不把 `edit.validate` 当作业务规则。
+- `delete` 限制批量删除的数量，检查每个 ID 的权限，并正确处理软删除。
 - `parseId` 能拒绝格式错误的 UUID、大整数或 ORM ID。
-- `like`、`in`、日期和 `NULL` 的语义已经在当前 ORM adapter 中测试。
+- `like`、`in`、日期和 `NULL` 的行为已经针对所用的 ORM 适配器测试过。
 - 事务、审计、限流、CORS、CSRF 和 session 生命周期由宿主 Web 应用负责。
-- 按钮 URL 和 `eval` 即使来自可信后端元数据，也不能跳过服务端授权。
+- 按钮的 URL 和 `eval` 即使来自可信的后端元数据，服务端也必须照常授权。
 
-## 与现有协议文档的关系
+## 相关文档
 
-本实现只提供一种 JavaScript 后端落地方式。需要跨语言互操作时，优先阅读 [交互规则](/protocol/http-api)；需要设计新的字段结构时，阅读 [模型定义](/protocol/metadata) 和 [字段类型与选项](/protocol/types)。
+这里介绍的只是后端的一种 JavaScript 实现。需要和其他语言的后端互通时，先读 [交互规则](/protocol/http-api)；需要设计新的字段结构时，读 [模型定义](/protocol/metadata) 和 [字段类型与选项](/protocol/types)。

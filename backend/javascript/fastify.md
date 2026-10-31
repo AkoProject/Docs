@@ -1,11 +1,11 @@
 ---
 title: Fastify 接入
-description: 在 Fastify 应用中挂载 Ako JavaScript handler，并使用 Fastify 的 body 与 response 生命周期。
+description: 用 @ako-dev/ako-js-fastify 把 Ako 请求处理函数注册为 Fastify 路由，沿用 Fastify 的请求体解析和响应流程。
 ---
 
 # Fastify 接入
 
-Fastify 使用 Node 请求对象和自己的 reply 封装。Ako 提供 `createFastifyHandler`，默认让 Fastify 管理状态码、headers 和 body；需要直接操作原始 Node response 时再使用 `createFastifyRawHandler`。
+`@ako-dev/ako-js-fastify` 提供两个函数：`createFastifyHandler` 通过 Fastify 的 `reply` 写出状态码、响应头和响应体，一般场景用它；`createFastifyRawHandler` 直接写原始 Node response，只在需要操作 `reply.raw` 时使用。
 
 ## 安装
 
@@ -13,7 +13,7 @@ Fastify 使用 Node 请求对象和自己的 reply 封装。Ako 提供 `createFa
 yarn add fastify
 ```
 
-Ako adapter 不在运行时导入 Fastify 类型，业务项目可以使用自己的 Fastify 版本和 TypeScript 配置：
+适配器在运行时不导入 Fastify，也不依赖 Fastify 的类型，业务项目可以使用自己的 Fastify 版本（4 及以上）和 TypeScript 配置：
 
 ```ts
 import Fastify from 'fastify'
@@ -21,7 +21,7 @@ import { createAkoHandler } from '@ako-dev/ako-js'
 import { createFastifyHandler } from '@ako-dev/ako-js-fastify'
 ```
 
-## 最小挂载
+## 挂载
 
 ```ts
 const app = Fastify({ logger: true })
@@ -39,11 +39,11 @@ await app.listen({
 })
 ```
 
-也可以为每个 Ako 路由注册一个 Fastify route；不要在同一个请求上同时调用 `reply.send` 和 `reply.raw.end`。
+也可以为每个 Ako 接口单独注册一条 Fastify 路由。同一个请求上不要既调用 `reply.send` 又调用 `reply.raw.end`。
 
-## Body 与限制
+## 请求体与选项
 
-Fastify 默认会解析 JSON body。`createFastifyHandler` 检测到 `request.body` 后，会把它传给 Web `Request`：
+Fastify 默认会解析 JSON 请求体。`createFastifyHandler` 发现 `request` 上有 `body` 属性时，直接把它作为 Web `Request` 的请求体：
 
 ```ts
 const akoHandler = createFastifyHandler(createAkoHandler(runtime), {
@@ -51,17 +51,23 @@ const akoHandler = createFastifyHandler(createAkoHandler(runtime), {
 })
 ```
 
-如果自定义 content type 或 parser 没有生成 body，可以把请求交给 `createFastifyRawHandler`，由 Node bridge 读取原始 stream：
+| 选项 | 默认值 | 说明 |
+| --- | --- | --- |
+| `maxBodyBytes` | `1048576`（1 MiB） | 适配器自己读取原始 stream 时允许的最大字节数 |
+
+`maxBodyBytes` 只在请求对象上没有 `body` 属性、需要读取原始 stream 时生效。Fastify 已经解析过的请求体，大小由 Fastify 自己的 `bodyLimit` 控制；之后 `AkoRuntime` 还会按自己的 `maxBodyBytes` 再检查一次。
+
+`createFastifyRawHandler` 接受同样的选项，处理请求体的方式也和 `createFastifyHandler` 相同，区别只在于它把响应直接写进 `reply.raw`：
 
 ```ts
 const rawAkoHandler = createFastifyRawHandler(createAkoHandler(runtime))
 ```
 
-普通 JSON 协议优先使用 `createFastifyHandler`，这样 Fastify 的 serializer 和生命周期仍然有效。
+普通 JSON 接口优先使用 `createFastifyHandler`，这样 Fastify 的 serializer 和生命周期钩子仍然有效。
 
-## Fastify plugin 形式
+## 以插件组织
 
-如果应用以 plugin 组织模块，可以把 runtime 和 handler 放在 plugin 闭包中：
+如果应用按 Fastify 插件拆分模块，可以把运行时和请求处理函数放在插件内部：
 
 ```ts
 async function akoPlugin(app) {
@@ -81,11 +87,11 @@ async function akoPlugin(app) {
 app.register(akoPlugin)
 ```
 
-runtime 应该在应用启动阶段创建一次，不要在每个请求中重新注册模型或连接数据库。
+运行时在应用启动时创建一次即可，不要在每个请求里重新注册模型或连接数据库。
 
 ## 错误处理
 
-handler 返回的 Ako `Response` 已经包含协议状态码和 JSON body。adapter 自己的 stream 错误会抛给 Fastify，由 Fastify 的 `setErrorHandler` 统一处理：
+请求处理函数返回的 `Response` 已经带有协议状态码和 JSON 响应体。适配器自身的错误（例如读取 stream 时请求体过大，会抛出状态码为 `413` 的 `AkoError`）会抛给 Fastify，由 `setErrorHandler` 统一处理：
 
 ```ts
 app.setErrorHandler((error, request, reply) => {
@@ -99,17 +105,17 @@ app.setErrorHandler((error, request, reply) => {
 })
 ```
 
-## Nest on Fastify
+## 在 Nest 中使用
 
-Nest 使用 Fastify adapter 时，优先把 Ako handler 注册到 Nest/底层 Fastify 实例的 HTTP 路由层。模型授权和认证仍然放在 `AkoRuntime`/repository；Nest guard 可以提前拒绝请求，但不能代替模型级授权。
+Nest 使用 Fastify 适配器时，把 Ako 请求处理函数注册到底层 Fastify 实例的路由上。认证和模型授权仍然放在 `AkoRuntime` 和 Repository 中；Nest guard 可以提前拒绝请求，但不能代替模型级授权。
 
 ## 常见问题
 
-- `request.body` 已被解析但内容为空：检查 Fastify content type parser 和 route 的 `Content-Type`。
-- 返回内容被二次 JSON 编码：不要在 handler 外再对 Ako `Response` 调用 `JSON.stringify`；`createFastifyHandler` 会以文本发送已编码的 JSON。
-- 使用 `reply.raw` 后响应挂起：确认使用的是 `createFastifyRawHandler`，且不要再调用 Fastify 的 `reply.send`。
+- `request.body` 已解析但内容为空：检查 Fastify 的 content type parser 和请求的 `Content-Type`。
+- 响应内容被二次 JSON 编码：不要在外面再对 Ako 的 `Response` 调用 `JSON.stringify`。`createFastifyHandler` 会把已经编码好的 JSON 当作文本发送。
+- 使用 `reply.raw` 后响应挂起：确认用的是 `createFastifyRawHandler`，并且没有再调用 `reply.send`。
 
-## 下一步
+## 延伸阅读
 
 - [Express 接入](/backend/javascript/express)
 - [Web 框架、鉴权与安全](/backend/javascript/controllers)

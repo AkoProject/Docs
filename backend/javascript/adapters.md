@@ -1,17 +1,17 @@
 ---
 title: 适配器总览
-description: Ako JavaScript 的 Web 框架与 ORM 适配边界，以及各框架接入指南索引。
+description: Ako JavaScript 的 Web 框架适配器与 ORM 适配器，以及各框架接入指南的索引。
 ---
 
 # 适配器总览
 
-Ako JavaScript 把适配器拆成两个方向：Web adapter 负责把框架请求交给 Ako handler，ORM adapter 负责把 `AkoPageQuery` 翻译成 ORM 查询。所有适配器都不把对应框架或 ORM 加入 Ako 核心运行时依赖。
+Ako JavaScript 的适配器分两类：Web 适配器把框架收到的请求交给 Ako 的请求处理函数，ORM 适配器把 `AkoPageQuery` 翻译成 ORM 查询。每个适配器都是独立的包，对应的框架或 ORM 不会成为 Ako 核心包的依赖。
 
-## 先选择你的技术栈
+## 按技术栈选择
 
-| 类型 | 入口 | 接入指南 |
+| 类型 | 包 | 接入指南 |
 | --- | --- | --- |
-| Node 原生 HTTP | `@ako-dev/ako-js-node` | [Node HTTP](/backend/javascript/project#nodejs-最小服务) |
+| Node 原生 HTTP | `@ako-dev/ako-js-node` | [Node HTTP](/backend/javascript/project#node-js-最小服务) |
 | Express | `@ako-dev/ako-js-express` | [Express 接入](/backend/javascript/express) |
 | Fastify | `@ako-dev/ako-js-fastify` | [Fastify 接入](/backend/javascript/fastify) |
 | Hono | `@ako-dev/ako-js-hono` | [Hono 接入](/backend/javascript/hono) |
@@ -22,9 +22,9 @@ Ako JavaScript 把适配器拆成两个方向：Web adapter 负责把框架请�
 | TypeORM | `@ako-dev/ako-js-typeorm` | [TypeORM 接入](/backend/javascript/typeorm) |
 | Sequelize | `@ako-dev/ako-js-sequelize` | [Sequelize 接入](/backend/javascript/sequelize) |
 
-ORM adapter 现在各自是独立 workspace package；为了避免 Node 标准库进入核心入口，Express、Fastify 和 Node HTTP adapter 也各自从独立 package 导入。
+Express、Fastify、Koa 依赖的 Node 桥接也单独放在 `@ako-dev/ako-js-node` 中，这样 `node:http` 不会进入核心包。
 
-## 两个边界
+## 整体结构
 
 ```text
 Web 框架 req/res 或 Fetch Request/Response
@@ -38,13 +38,13 @@ Web 框架 req/res 或 Fetch Request/Response
      ORM / SQL / 远程服务 Repository
 ```
 
-核心 handler 的类型是：
+核心包的请求处理函数类型是：
 
 ```ts
 type AkoHandler = (request: Request) => Promise<Response>
 ```
 
-repository 的最小合约是：
+Repository 需要实现的最小接口是：
 
 ```ts
 interface AkoRepository<TEntity extends object, TId> {
@@ -58,11 +58,11 @@ interface AkoRepository<TEntity extends object, TId> {
 }
 ```
 
-Web adapter 不应该知道数据库表结构；ORM adapter 也不应该知道 HTTP headers、session 或浏览器组件。
+Web 适配器不需要了解数据库表结构；ORM 适配器也不需要了解 HTTP 请求头、session 或浏览器组件。
 
-## canonical 查询
+## 统一的查询计划
 
-客户端请求中的 `params` 与 `sort` 先由 runtime 按模型字段白名单解析，再变成统一查询计划：
+客户端请求中的 `params` 和 `sort` 先由运行时按模型字段白名单解析，转换成统一的查询计划：
 
 ```ts
 {
@@ -79,15 +79,15 @@ Web adapter 不应该知道数据库表结构；ORM adapter 也不应该知道 H
 }
 ```
 
-适配器可以把它翻译成 Prisma `where`、Drizzle expression、TypeORM Find Operator 或 Sequelize `Op` 对象，但不能把客户端字符串直接拼接为 SQL。
+ORM 适配器再把它翻译成 Prisma 的 `where`、Drizzle 表达式、TypeORM 的 Find Operator 或 Sequelize 的 `Op` 对象。客户端传来的字符串始终不会直接拼进 SQL。
 
-## 选择与扩展原则
+## 选型与扩展建议
 
-- Fetch 风格框架优先直接复用 `createAkoHandler`；不需要为了 Hono、Elysia 或 Bun 再复制一套核心路由。
-- Node 风格框架只负责把 stream 和 response 写回；Express/Fastify 的 body parser 应由宿主框架管理。
-- Prisma、TypeORM、Sequelize 的默认 adapter 可以处理常见过滤；复杂关系、租户条件和特殊 SQL 应通过扩展 callback 接入。
-- Drizzle 的列和 operator 与 SQL 方言强相关，因此 adapter 注入 `columns`、`operators`、`select` 和 `count`，不隐藏方言差异。
-- 事务、软删除、审计、字段级权限和行级权限必须留在 repository 或领域 service。
+- Fetch 风格的框架直接复用 `createAkoHandler` 即可，不必为 Hono、Elysia 或 Bun 再写一套路由。
+- Node 风格框架的适配器只负责转换请求流、写回响应。请求体解析器（body parser）由 Express、Fastify 等宿主框架自己管理。
+- Prisma、TypeORM、Sequelize 适配器的默认实现能处理常见的过滤条件。复杂关联、租户条件和特殊 SQL 可以通过扩展回调接入。
+- Drizzle 的列和操作符与 SQL 方言紧密相关，所以它的适配器要求注入 `columns`、`operators`、`select` 和 `count`，不去掩盖方言差异。
+- 事务、软删除、审计、字段级权限和行级权限，必须留在 Repository 或领域服务中处理。
 
 继续阅读：
 

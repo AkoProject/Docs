@@ -1,20 +1,20 @@
 ---
 title: 模型与元数据
-description: 使用 TypeScript schema 声明 Ako JavaScript 模型、字段类型、关联信息和页面配置。
+description: 用 TypeScript schema 声明 Ako JavaScript 的模型、字段类型、关联信息和页面配置。
 ---
 
 # 模型与元数据
 
-JavaScript 侧用 `defineModel` 和字段 helper 显式声明模型。它们生成的是前端可以直接消费的 Ako 元数据，不要求业务实体本身使用装饰器或继承 Ako 基类。
+JavaScript 版用 `defineModel` 和一组字段辅助函数显式声明模型。它们生成的元数据前端可以直接使用，业务实体本身不需要加装饰器，也不需要继承 Ako 的基类。
 
 ## 第一个模型
 
-模型至少需要：
+一个模型至少需要以下几项：
 
-- 稳定的 `id`，用于 `menu` 和 `model/{model}` 路由。
-- `name`，用于菜单和页面标题。
-- `repository`，用于分页、列表、保存和删除。
-- 包含主键字段的 `fields`。
+- `id`：要保持稳定，菜单和 `model/{model}` 路由都用它。
+- `name`：显示在菜单和页面标题上。
+- `repository`：负责分页、列表、保存和删除。
+- `fields`：字段列表，其中必须包含主键字段。
 
 ```ts
 type Student = {
@@ -50,9 +50,9 @@ const studentModel = defineModel<Student, number>({
 })
 ```
 
-默认情况下，`defineModel` 会让 `id` 字段排在 `fields` 第一位，并生成与 JVM 默认实现一致的页面级“查询/新增/批量删除”和行级“编辑/删除”按钮。传入 `modelButtons: []` 或 `operateButtons: []` 可以显式关闭默认按钮。
+`defineModel` 会把主键字段移到 `fields` 的第一位，并默认生成和后端（JVM）一样的按钮：页面上方的“查询”“新增”“批量删除”，以及每行的“编辑”“删除”。传入 `modelButtons: []` 或 `operateButtons: []` 可以去掉这些默认按钮。
 
-如果主键字段不是 `id`，必须同时声明模型的 `idField`：
+主键字段不叫 `id` 时，要通过 `idField` 指明：
 
 ```ts
 const orderModel = defineModel<Order, string>({
@@ -67,11 +67,11 @@ const orderModel = defineModel<Order, string>({
 })
 ```
 
-`idField` 只决定 Ako 查询默认排序和 ID 转换；实体返回给前端时，仍建议保留前端按钮脚本使用的 `id` 字段，或者覆盖自己的按钮脚本。
+`idField` 决定哪个字段作为接口中的 `idField` 返回给前端，也是请求没有指定排序时的默认排序字段。删除请求中的 ID 类型转换由 `parseId` 负责，与它无关。另外，默认按钮的脚本读取的是实体的 `id` 属性，所以返回给前端的实体最好仍带上 `id`，否则就要自己改写按钮脚本。
 
 ## 字段默认值
 
-`defineField` 默认生成三个显示区域：搜索、表格列和编辑项。通过传入 `null` 可以关闭其中一个区域：
+`defineField` 默认会让字段出现在三个地方：搜索表单、表格列和编辑表单。把对应配置设为 `null` 就能去掉其中一处：
 
 ```ts
 defineField({
@@ -87,20 +87,20 @@ defineField({
 
 | 配置 | 默认值 | 作用 |
 | --- | --- | --- |
-| `type` | `ako:text` | 前端 TypeProvider 的名称。 |
-| `options` | `null` | 类型专属配置，只应放可公开的 JSON。 |
-| `search` | 等于查询 | `null` 时不显示在搜索表单。 |
-| `edit` | 可编辑 | `null` 时不显示在编辑表单。 |
-| `column` | 宽度 `200` | `null` 时不显示在表格。 |
-| `nullable` | `true` | 影响默认 `edit.require`。 |
-| `editable` | `true` | 生成 `edit.editable`。 |
-| `searchOpt` | `eq` | 默认搜索操作符。 |
+| `type` | `ako:text` | 前端类型提供者的名称。 |
+| `options` | `null` | 该类型专属的配置，只能放可以公开的 JSON。 |
+| `search` | 等值查询 | 设为 `null` 时不出现在搜索表单。 |
+| `edit` | 可编辑 | 设为 `null` 时不出现在编辑表单。 |
+| `column` | 宽度 `200` | 设为 `null` 时不出现在表格中。 |
+| `nullable` | `true` | 决定 `edit.require` 的默认值。 |
+| `editable` | `true` | 用于生成 `edit.editable`。 |
+| `searchOpt` | `eq` | 默认的搜索操作符。 |
 
-完整的 `DbField` 协议仍见 [模型定义](/protocol/metadata)。JavaScript helper 的目标是提供便捷默认值，而不是改变协议字段名称。
+`DbField` 的完整字段说明见 [模型定义](/protocol/metadata)。这些辅助函数只是补上常用的默认值，字段名称和接口中的保持一致。
 
 ## 枚举
 
-使用 `enumField` 生成 `ako:enum`：
+用 `enumField` 生成 `ako:enum` 类型的字段：
 
 ```ts
 enumField({
@@ -113,7 +113,7 @@ enumField({
 })
 ```
 
-它会生成如下 `options`：
+生成的 `options` 如下：
 
 ```json
 {
@@ -127,7 +127,7 @@ enumField({
 }
 ```
 
-级联枚举可以按控制字段的值提供多组选项：
+级联枚举按控制字段的取值分别提供选项：
 
 ```ts
 enumField({
@@ -143,7 +143,7 @@ enumField({
 
 ## 关联字段
 
-单级关联直接传目标模型、匹配字段和显示字段；helper 会自动生成协议要求的 `values.__blank__`：
+单级关联直接写目标模型、匹配字段和显示字段，`mappingField` 会自动补上接口要求的 `values.__blank__`：
 
 ```ts
 mappingField({
@@ -158,7 +158,7 @@ mappingField({
 })
 ```
 
-分页 `Student` 时，runtime 会收集当前页的 `groupId`，调用 `Group.repository.list`，再生成：
+查询 `Student` 分页时，运行时会收集当前页所有的 `groupId`，调用 `Group` 模型 Repository 的 `list`，然后生成：
 
 ```json
 {
@@ -172,9 +172,9 @@ mappingField({
 }
 ```
 
-这与前端内置 mapping TypeProvider 的读取方式一致。目标模型必须注册到同一个 `AkoRuntime`，并实现 `list`。如果目标模型有自己的 `authorize`，runtime 也会在读取关联信息时检查它。
+前端内置的 mapping 类型提供者正是按这个结构读取数据。目标模型必须注册在同一个 `AkoRuntime` 中，并实现 `list`。如果目标模型配置了 `authorize`，运行时读取关联信息前也会检查它。
 
-如果存在控制字段，则使用级联形式；这时 `values` 的键表示控制字段值，`cascader` 表示当前实体的控制字段：
+需要根据另一个字段决定关联目标时，使用级联写法。`cascader` 指当前实体上的控制字段，`values` 的键是控制字段的取值：
 
 ```ts
 mappingField({
@@ -190,11 +190,11 @@ mappingField({
 })
 ```
 
-底层协议仍然保留 `values: { __blank__: ... }` 的完整写法，因此旧配置可以继续使用；只有单级关联可以省略这个内部键。
+`values: { __blank__: ... }` 的完整写法依然可用，旧配置不用改。只有单级关联才能省略这个内部键。
 
 ## 时间字段
 
-`timestampField` 的 `format` 遵循前端 dayjs 格式，并默认提供 `gte`/`lte` 两个范围搜索项：
+`timestampField` 的 `format` 使用前端 dayjs 的格式写法，并默认提供 `gte`、`lte` 两个范围搜索项：
 
 ```ts
 timestampField({
@@ -205,11 +205,11 @@ timestampField({
 })
 ```
 
-时间值的实际存储类型和时区由 repository 决定。协议只约定格式选项和搜索操作符，不能替代数据库时区策略。
+时间值在数据库中用什么类型存储、按哪个时区处理，都由 Repository 决定。接口只规定显示格式和搜索操作符，不负责时区。
 
-## 自定义类型、节点和按钮
+## 自定义类型、页面节点和按钮
 
-没有 helper 的类型可以直接指定稳定的命名空间：
+没有现成辅助函数的类型，可以直接写一个带命名空间的类型名：
 
 ```ts
 defineField({
@@ -223,7 +223,7 @@ defineField({
 })
 ```
 
-前端必须注册名称相同的 TypeProvider。页面节点也可以在模型上覆盖：
+前端需要注册同名的类型提供者。模型上也可以覆盖默认的页面节点：
 
 ```ts
 defineModel({
@@ -235,11 +235,11 @@ defineModel({
 })
 ```
 
-按钮配置直接对应协议中的 `ButtonEntry`，适合描述自定义 URL、确认提示、Dialog 或编辑 Panel。按钮里的 `eval` 在浏览器执行，不能放入密钥、数据库操作或最终权限判断。
+按钮配置和接口中的 `ButtonEntry` 一一对应，可以描述自定义 URL、确认提示、Dialog 或编辑 Panel。按钮的 `eval` 在浏览器中执行，里面不能放密钥、数据库操作，也不能当作最终的权限判断。
 
-## 隐藏模型与安全投影
+## 隐藏模型与控制返回字段
 
-`expose: false` 的模型不会出现在 `menu/list/{channel}`，也不能通过 `model/page`、`save`、`delete` 路由访问：
+设置了 `expose: false` 的模型不会出现在 `menu/list/{channel}` 的结果里，也无法通过 `model/page`、`model/save`、`model/delete` 路由访问：
 
 ```ts
 defineModel({
@@ -251,7 +251,7 @@ defineModel({
 })
 ```
 
-默认实体序列化是原样返回。实际业务模型建议明确投影：
+实体默认原样返回给前端。实际业务中建议用 `serializeEntity` 明确列出要返回的字段：
 
 ```ts
 const userModel = defineModel<User, string>({
@@ -267,4 +267,4 @@ const userModel = defineModel<User, string>({
 })
 ```
 
-密码哈希、租户内部字段、数据库版本号和审计上下文不应因为实体对象可枚举就自动进入 HTTP 响应。
+密码哈希、租户内部字段、数据库版本号和审计信息，不应该仅仅因为是实体对象上的可枚举属性，就跟着进了 HTTP 响应。

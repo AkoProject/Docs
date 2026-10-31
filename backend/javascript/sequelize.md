@@ -1,19 +1,19 @@
 ---
 title: Sequelize 接入
-description: 读取 Sequelize schema、生成 Ako 字段元数据，并接入查询、保存、删除和自定义标记。
+description: 读取 Sequelize 模型的属性定义生成 Ako 字段元数据，并接入查询、保存、删除和自定义标记。
 ---
 
 # Sequelize 接入
 
-Sequelize 的 Model 本身已经保存了字段 schema；Ako adapter 可以在模型初始化后读取这些信息，再补充页面层 metadata。这样数据库字段声明仍然由 Sequelize 负责，Ako 只增加管理后台需要的显示、搜索、编辑和关联配置。
+Sequelize 的 Model 本身已经保存了字段定义。`@ako-dev/ako-js-sequelize` 可以在模型初始化后读取这些定义，再补充页面需要的元数据。数据库字段仍由 Sequelize 声明，Ako 只补充管理后台需要的显示、搜索、编辑和关联配置。适配器不导入 Sequelize，同时兼容 v6 和 v7 的模型结构。
 
-## 安装与 repository
+## 安装与创建 Repository
 
 ```bash
 yarn add sequelize
 ```
 
-Ako adapter 不直接导入 Sequelize。业务应用负责创建 Model，并把 `Model` 与 `Op` 符号注入：
+业务应用负责创建 Model，并把 `Model` 和 `Op` 中的符号传给适配器：
 
 ```ts
 import { Op } from 'sequelize'
@@ -36,31 +36,48 @@ const repository = createSequelizeRepository<Student, number>({
 })
 ```
 
-默认 repository 使用 Sequelize 的 `findAndCountAll`、`findAll`、`create`/`update` 和 `destroy`。如果模型启用了 `paranoid`，删除会沿用 Sequelize 的软删除行为；需要物理删除时显式设置 `force`。
+默认 Repository 使用 Sequelize 的 `findAndCountAll`、`findAll`、`upsert`/`create`、`update` 和 `destroy`。保存时数据中没有 ID，就调用 `upsert`（模型没有 `upsert` 时退回 `create`）；有 ID 时按主键调用 `update`。模型启用了 `paranoid` 时，删除沿用 Sequelize 的软删除；需要物理删除时设置 `force: true`。
 
-## 查询映射
+## 选项
+
+| 选项 | 默认值 | 说明 |
+| --- | --- | --- |
+| `model` | 必填 | Sequelize Model 类 |
+| `operators` | 必填 | `Op` 中的 `eq`、`like`、`gt`、`gte`、`lt`、`lte`、`ne`、`in`、`is`、`not` |
+| `idField` | `'id'` | 主键字段，用于区分新增和更新，以及默认删除 |
+| `fieldMap` | 无 | Ako 字段 ID 到 Sequelize 属性或列名的映射，可以是对象或函数 |
+| `findOptions` | 无 | 合并进 `findAndCountAll`、`findAll` 的额外参数 |
+| `updateOptions` | 无 | 合并进 `update` 的额外参数 |
+| `destroyOptions` | 无 | 合并进 `destroy` 的额外参数 |
+| `force` | 不设置 | 传给 `destroy` 的 `force`，`paranoid` 模型据此决定是否物理删除 |
+| `toWhere` | 默认转换 | `(filters, operators) => where`，自定义过滤条件 |
+| `toOrder` | 默认转换 | `(sort, fieldMap) => order`，自定义排序 |
+| `save` | 默认保存 | `(data, model) => ...`，替换默认保存逻辑 |
+| `remove` | 默认删除 | `(ids, model) => ...`，替换默认删除逻辑 |
+
+## 查询转换
 
 | Ako | Sequelize |
 | --- | --- |
-| `eq` | 字段直接使用值；同字段有多个条件时使用 `Op.eq` |
+| `eq` | 字段直接使用值；同一字段有多个条件时使用 `Op.eq` |
 | `like` | `Op.like` |
-| `gt`/`gte`/`lt`/`lte` | 对应 `Op` 符号 |
+| `gt`/`gte`/`lt`/`lte` | 对应的 `Op` 符号 |
 | `ne` | `Op.ne` |
 | `in` | `Op.in` |
 | `isNull` | `Op.is: null` 或 `Op.not: null` |
 | sort | `order: [[field, 'ASC'/'DESC']]` |
 | page | `offset` + `limit` |
 
-字段 ID 已经由 Ako runtime 按模型 schema 白名单检查；`fieldMap` 可以把 Ako 字段映射到 Sequelize attribute/column 名称。
+默认转换由包中导出的 `toSequelizeWhere` 和 `toSequelizeOrder` 完成。字段 ID 在进入适配器之前，已经由 Ako 运行时按模型字段做过白名单检查；`fieldMap` 再把 Ako 字段映射到 Sequelize 的属性或列名。
 
-## 从 Sequelize schema 生成字段
+## 从 Sequelize 模型生成字段
 
-Sequelize v6 可以通过 `getAttributes()` 或 `rawAttributes` 读取属性配置。Sequelize v7 的 `modelDefinition` 同时提供规范化 `attributes` 和原始 `rawAttributes`。项目中的 `sequelizeFields` 按以下顺序读取：
+Sequelize v6 可以通过 `getAttributes()` 或 `rawAttributes` 读取属性定义；v7 的 `modelDefinition` 同时提供规范化后的 `attributes` 和原始的 `rawAttributes`。`sequelizeFields` 按以下顺序读取：
 
 1. `model.getAttributes()`。
 2. `model.rawAttributes`。
 3. `model.modelDefinition.rawAttributes`。
-4. `model.modelDefinition.attributes`，兼容 object、Map 和 Map-like `entries()`。
+4. `model.modelDefinition.attributes`，支持普通对象、Map 和带 `entries()` 方法的类 Map 对象。
 
 ```ts
 import { sequelizeFields } from '@ako-dev/ako-js-sequelize'
@@ -75,25 +92,28 @@ const model = defineModel({
 })
 ```
 
-当前自动推断：
+ID 字段依次取自 `idField` 选项、已注册的模型元数据和第一个 `primaryKey: true` 的属性，都没有时为 `id`；模型中不存在该属性会直接报错。其余字段按下表推断：
 
 | Sequelize 属性 | Ako 结果 |
 | --- | --- |
-| `primaryKey`/`autoIncrement` | ID 字段，默认不可编辑。 |
-| `allowNull: false` | `nullable: false`，默认编辑必填。 |
-| `comment` | 字段 `description` 的默认来源。 |
-| `type.key: 'ENUM'` + `values` | `ako:enum`。 |
-| `type.key: 'BOOLEAN'` | “是/否”枚举。 |
-| `type.key: 'DATE'` | `ako:timestamp`，默认格式 `YYYY-MM-DD HH:mm:ss`。 |
-| `type.key: 'DATEONLY'` | `ako:timestamp`，格式 `YYYY-MM-DD`。 |
-| `type.key: 'TIME'` | `ako:timestamp`，格式 `HH:mm:ss`。 |
-| `type.key: 'VIRTUAL'` | 默认跳过；`sequelizeFields({ includeVirtual: true })` 可显式包含。 |
+| `primaryKey` 或 `autoIncrement` | 默认不可编辑 |
+| `allowNull: false` | `nullable: false`，编辑时默认必填 |
+| `comment` | 字段 `description` 的默认值 |
+| `type.key: 'ENUM'` + `values` | `ako:enum` |
+| `type.key: 'BOOLEAN'` | “是/否”枚举 |
+| `type.key: 'DATE'` | `ako:timestamp`，默认格式 `YYYY-MM-DD HH:mm:ss` |
+| `type.key: 'DATEONLY'` | `ako:timestamp`，格式 `YYYY-MM-DD` |
+| `type.key: 'TIME'` | `ako:timestamp`，格式 `HH:mm:ss` |
+| `type.key: 'VIRTUAL'` | 默认跳过；`sequelizeFields(StudentModel, { includeVirtual: true })` 可以包含进来 |
+| 其他类型 | `ako:text` |
 
-数据库 `references`、association 和 Sequelize validator 不会被擅自变成 Ako mapping 或浏览器校验。它们带有数据库和领域语义，应通过 Ako metadata 或服务端规则显式表达。
+字段元数据中声明了 `mapping` 或 `type` 时，以元数据为准，不再按 Sequelize 类型推断；时间类字段的 `options` 写成字符串时会作为显示格式。
 
-## 直接添加属性级 metadata
+数据库的 `references`、association 和 Sequelize validator 不会被自动转换成 Ako 的 mapping 或前端校验。它们涉及数据库约束和业务规则，应通过 Ako 元数据或服务端规则显式声明。
 
-Ako 提供 `withAkoAttributeMetadata`，给 Sequelize attribute object 增加一个命名空间内的 `ako` 标记：
+## 在属性上添加元数据
+
+`withAkoAttributeMetadata` 会在 Sequelize 属性定义对象上加一个 `ako` 键，存放 Ako 元数据：
 
 ```ts
 import { DataTypes, Model } from 'sequelize'
@@ -118,11 +138,11 @@ StudentModel.init({
 }, { sequelize, modelName: 'Student' })
 ```
 
-属性标记适合让页面配置靠近字段声明。由于不同 Sequelize 版本对属性规范化和 TypeScript 类型的暴露方式不同，不能只依赖未知 `ako` 键一定会被保留。
+这种写法让页面配置紧挨着字段声明。但不同 Sequelize 版本在规范化属性和暴露 TypeScript 类型时处理方式不同，未知的 `ako` 键不一定会被保留，所以不要只依赖这一种方式。
 
-## 使用 metadata plugin
+## 使用元数据插件
 
-更稳妥的方式是使用项目提供的 plugin facade：
+更稳妥的做法是把元数据注册到模型上：
 
 ```ts
 import { createSequelizeAkoMetadataPlugin } from '@ako-dev/ako-js-sequelize'
@@ -142,7 +162,7 @@ ako.model(StudentModel, {
 })
 ```
 
-模型 metadata 保存在 WeakMap 中，不会进入 SQL、Sequelize attribute 或 HTTP 响应。然后用 `defineModelFromSequelize` 合成 Ako model：
+插件对象只是把两个函数放在一起：`ako.attribute` 等同于 `withAkoAttributeMetadata`，`ako.model` 等同于 `registerSequelizeModelMetadata`。模型元数据保存在 WeakMap 中，不会进入 SQL、Sequelize 属性定义或 HTTP 响应。接着用 `defineModelFromSequelize` 生成 Ako 模型：
 
 ```ts
 const model = defineModelFromSequelize(StudentModel, {
@@ -151,11 +171,11 @@ const model = defineModelFromSequelize(StudentModel, {
 })
 ```
 
-`defineModelFromSequelize` 会合并注册的模型 metadata、属性上的 `ako` metadata 和调用处的显式 options；调用处的 model options 优先，字段级 metadata 会覆盖相同字段的推断默认值。
+`defineModelFromSequelize` 会合并三处配置：注册的模型元数据、属性上的 `ako` 元数据和调用时传入的选项。模型级配置的优先级是：调用时的选项 > `metadata` 选项 > 注册的元数据；几处都没有给出模型 ID 时，取 Sequelize 的 `modelName`（或模型类名）。字段元数据会覆盖按类型推断的默认值；同一字段在多处都有元数据时，调用时传入的 `metadata.fields` 优先。传入 `fields` 选项则会整体替换推断出的字段列表。
 
-## 显式 `metadata` 选项
+## 显式传入 `metadata`
 
-不想使用全局 WeakMap 时，也可以在合成模型时传入 metadata：
+不想使用全局 WeakMap 时，可以在生成模型时直接传入元数据：
 
 ```ts
 const model = defineModelFromSequelize(StudentModel, {
@@ -182,11 +202,11 @@ const model = defineModelFromSequelize(StudentModel, {
 })
 ```
 
-这样可以把 Sequelize schema 和 Ako 页面 schema 分开维护，同时仍然从 Sequelize 原生模型推断字段列表。
+这样 Sequelize 的字段定义和 Ako 的页面配置可以分开维护，字段列表仍然从 Sequelize 模型推断。
 
 ## `sequelize-typescript`
 
-如果业务使用 `sequelize-typescript`，可以继续使用 `@Table`、`@Column`、`@Comment`、`@AllowNull` 等装饰器。模型初始化后，adapter 仍然从同一个 Sequelize Model 读取属性；额外 Ako metadata 可以通过 `registerSequelizeModelMetadata` 注册：
+使用 `sequelize-typescript` 时，可以继续用 `@Table`、`@Column`、`@Comment`、`@AllowNull` 等装饰器。模型初始化后，适配器照样从同一个 Sequelize Model 读取属性；额外的 Ako 元数据通过 `registerSequelizeModelMetadata` 注册：
 
 ```ts
 import { registerSequelizeModelMetadata } from '@ako-dev/ako-js-sequelize'
@@ -201,11 +221,11 @@ registerSequelizeModelMetadata(StudentModel, {
 })
 ```
 
-装饰器推断出的 TypeScript 属性类型只解决编译期类型检查，不能自动决定 Ako 页面组件、关联显示字段或权限；这些信息仍建议显式声明。
+装饰器推断出的 TypeScript 类型只用于编译期检查，决定不了 Ako 的页面组件、关联显示字段或权限，这些仍建议显式声明。
 
-## 主键、BigInt 与响应安全
+## 主键、BigInt 与响应字段
 
-Sequelize 的 `BIGINT` 可能需要按字符串或 `bigint` 处理。Ako model 可以显式转换删除请求的 ID：
+Sequelize 的 `BIGINT` 可能需要按字符串或 `bigint` 处理。可以在 Ako 模型上显式转换删除请求中的 ID：
 
 ```ts
 const model = defineModelFromSequelize(AccountModel, {
@@ -218,11 +238,11 @@ const model = defineModelFromSequelize(AccountModel, {
 })
 ```
 
-不要依赖 Sequelize Model instance 的所有可枚举属性自动成为 HTTP 响应；生产模型应使用 `serializeEntity` 投影公开字段。
+`defineModelFromSequelize` 默认调用实例的 `toJSON()` 生成响应，会输出模型的全部属性。生产环境应通过 `serializeEntity` 只返回需要公开的字段。
 
 ## 事务与 paranoid
 
-Ako runtime 不隐式创建 Sequelize transaction。推荐在应用 service 或 repository callback 中传入并复用 transaction：
+Ako 运行时不会隐式创建 Sequelize 事务。建议在应用 service 或 Repository 回调中传入并复用事务：
 
 ```ts
 const repository = createSequelizeRepository({
@@ -236,9 +256,9 @@ const repository = createSequelizeRepository({
 })
 ```
 
-`paranoid` 模型默认由 Sequelize 排除已删除记录；Ako adapter 不改变这个语义。租户过滤、审计、锁和业务校验仍应在 repository/领域 service 中实现。
+`paranoid` 模型默认由 Sequelize 排除已删除的记录，适配器不改变这一行为。租户过滤、审计、锁和业务校验仍应放在 Repository 或领域 service 中实现。
 
-## 下一步
+## 延伸阅读
 
 - [适配器总览](/backend/javascript/adapters)
 - [模型与元数据](/backend/javascript/models)
