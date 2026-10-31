@@ -1,27 +1,27 @@
 ---
 title: 数据访问与事务
-description: 对比 ako-rain 与 ako-spring 的 Access、Repository、查询、事务和软删除。
+description: ako-rain 与 ako-spring 在 Access、Repository、查询、事务、软删除和保存钩子上的写法与区别。
 ---
 
 # 数据访问与事务
 
-Ako 只规定模型上下文需要完成分页、保存和删除；具体如何查库、开启事务和实现软删除，由 JVM 适配器决定。`ako-rain` 使用 SmartAccess/JPA，`ako-spring` 使用 Spring Data JPA 或 `AkoSpringDatabase` SPI。
+Ako 只要求模型上下文能分页、保存和删除。怎么查库、怎么开事务、怎么做软删除，都由各自的适配器决定：`ako-rain` 用 SmartAccess/JPA，`ako-spring` 用 Spring Data JPA 或自定义的 `AkoSpringDatabase`。
 
 ## 模型基类
 
-Rain 与 Spring Data Boot 3/4 共享 `ako-jpa` 的模型基类；Spring Boot 2 的 `javax.persistence` 兼容路径不强制使用这些 Jakarta 基类：
+Rain 和 Spring Data（Boot 3/4）共用 `ako-jpa` 里的模型基类。Spring Boot 2 项目使用 `javax.persistence`，不必继承这些基于 Jakarta 的基类：
 
 | 基类 | 能力 |
 | --- | --- |
-| `AkoModel` | 只有 Ako 模型标记，不绑定 JPA。 |
-| `AkoModelBase` | 创建时间、更新时间生命周期字段。 |
+| `AkoModel` | 仅标记这是一个 Ako 模型，不依赖 JPA。 |
+| `AkoModelBase` | 自动维护创建时间和更新时间。 |
 | `IdentityModel` | `AkoModelBase` + 自增 `Int` ID。 |
-| `SoftDeleteModel` | `AkoModelBase` + 删除时间字段和软删除语义。 |
+| `SoftDeleteModel` | `AkoModelBase` + 删除时间字段，用于软删除。 |
 | `CompleteModel` | `SoftDeleteModel` + 自增 `Int` ID。 |
-| `LongIdentityModel` / `LongCompleteModel` | Long ID 版本。 |
-| `UuidV4IdentityModel` / `UuidV4CompleteModel` | UUID ID 版本。 |
+| `LongIdentityModel` / `LongCompleteModel` | 对应的 `Long` ID 版本。 |
+| `UuidV4IdentityModel` / `UuidV4CompleteModel` | 对应的 UUID ID 版本。 |
 
-基类和 Ako 注解是共同层；Access/Repository、查询实现和事务管理器才是框架差异。
+基类和 Ako 注解两边通用，真正不同的是 Access/Repository、查询实现和事务管理器。
 
 ## Access 与 Repository
 
@@ -37,7 +37,7 @@ interface StudentAccess : SoftDeleteAccess<Student, Int>
 val access = findAccess<StudentAccess>()
 val student = Student(name = "Alice")
 access.saveOrUpdate(student)`,
-    note: 'Rain 的 Access 继承 SmartAccess 的 JpaAccess，由 ClassRegister 发现并由 Rain 容器提供实现。',
+    note: 'Rain 的 Access 继承 SmartAccess 的 JpaAccess，由 ClassRegister 发现，实现由 Rain 容器提供。',
   },
   {
     language: 'Java',
@@ -49,7 +49,7 @@ public interface StudentAccess extends SoftDeleteAccess<Student, Integer> {}
 Student student = new Student();
 student.setName("Alice");
 studentAccess.saveOrUpdate(student);`,
-    note: 'Rain Java 使用接口继承声明 Access，并通过 Rain DI 注入 studentAccess；保存调用 SmartAccess 的 saveOrUpdate。',
+    note: 'Java 同样用接口继承声明 Access，studentAccess 通过 Rain 依赖注入获得；保存调用 SmartAccess 的 saveOrUpdate。',
   },
   {
     language: 'Kotlin',
@@ -63,7 +63,7 @@ interface StudentRepository : SoftDeleteAccess<Student, Int> {
 
 val student = Student().apply { name = "Alice" }
 studentRepository.save(student)`,
-    note: 'Spring Data Repository 是 Spring Bean；AkoSpringRuntime 从 ApplicationContext 延迟解析 findAccess() 返回的代理。',
+    note: 'Spring Data Repository 是普通的 Spring Bean；findAccess() 返回的代理在调用时才由 AkoSpringRuntime 从 ApplicationContext 取出真正的 Bean。',
   },
   {
     language: 'Java',
@@ -78,7 +78,7 @@ public interface StudentRepository extends SoftDeleteAccess<Student, Integer> {
 Student student = new Student();
 student.setName("Alice");
 studentRepository.save(student);`,
-    note: 'Spring Java 通过构造器注入 StudentRepository；Repository 既是 Spring Data JPA 接口，也是 Ako 模型的数据访问入口。',
+    note: 'Java 通过构造器注入 StudentRepository；它既是 Spring Data JPA 的 Repository，也是 Ako 模型的数据访问入口。',
   },
 ]
 
@@ -98,7 +98,7 @@ val page = Student.wherePage(
   emptyMap(),
   page = Page(0, 20),
 )`,
-    note: 'Rain 的 SmartAccess Page 使用 offset；AkoRainModelContext 会把前端的 1-based page 转成 offset。',
+    note: 'SmartAccess 的 Page 第一个参数是 offset；AkoRainModelContext 会把前端从 1 开始的页码换算成 offset。',
   },
   {
     language: 'Java',
@@ -116,7 +116,7 @@ List<Student> rows = studentAccess.whereQuery(
   new Page(0, 20),
   "ASC"
 );`,
-    note: 'Rain Java 直接调用 SmartAccess 的 whereQuery；Page 的第一个参数是从 0 开始的 offset。',
+    note: 'Java 直接调用 AkoAccess 的 whereQuery；Page 的第一个参数是从 0 开始的 offset。',
   },
   {
     language: 'Kotlin',
@@ -132,7 +132,7 @@ val page = runtime.modelMap["Student"]!!.wherePage(
   pid = 1,
   pSize = 20,
 )`,
-    note: 'Spring Data 适合声明领域查询；AkoSpringDataDatabase 使用 Jakarta Criteria API 处理通用字段过滤和分页。',
+    note: '业务查询用 Spring Data 的派生方法声明；Ako 的通用过滤和分页由 AkoSpringDataDatabase 通过 Jakarta Criteria API 执行。',
   },
   {
     language: 'Java',
@@ -140,6 +140,7 @@ val page = runtime.modelMap["Student"]!!.wherePage(
     code: `import ako.model.base.ModelContext;
 import ako.model.resp.PageResp;
 import ako.spring.AkoSpringRuntime;
+import java.util.List;
 import java.util.Map;
 
 List<Student> rows = studentRepository.findByNameContainingIgnoreCase("Alice");
@@ -153,7 +154,56 @@ PageResp<?> page = context.wherePage(
   1,
   20
 );`,
-    note: 'Spring Java 使用 Repository 派生查询或 Runtime 的 modelMap；Ako 通用分页使用 1-based 页码并由 Criteria API 执行。',
+    note: 'Java 可以用 Repository 的派生查询，也可以通过运行时的 modelMap 调用 Ako 通用分页；页码从 1 开始，由 Criteria API 执行。',
+  },
+]
+
+const saveHookExamples = [
+  {
+    language: 'Kotlin',
+    framework: 'ako-rain',
+    code: `import ako.\`fun\`.webError
+import ako.rain.access.SoftDeleteAccess
+
+interface StudentAccess : SoftDeleteAccess<Student, Int> {
+  fun findByName(name: String): Student?
+
+  override fun akoPreSave(data: Student) {
+    data.name = data.name.trim()
+    val exists = findByName(data.name)
+    if (exists != null && exists.id != data.id) webError(1000001, "学生姓名已存在")
+  }
+
+  override fun akoPostSave(data: Student) {
+    // 保存成功后执行，仍在同一事务中
+  }
+}`,
+    note: '钩子写在 Access 接口里，由 AkoRainModelContext 在标准保存流程中调用；webError 抛出的异常会让本次保存回滚。',
+  },
+  {
+    language: 'Java',
+    framework: 'ako-rain',
+    code: `import ako.rain.access.SoftDeleteAccess;
+import static ako.fun.WebErrorKt.webError;
+
+public interface StudentAccess extends SoftDeleteAccess<Student, Integer> {
+  Student findByName(String name);
+
+  @Override
+  default void akoPreSave(Student data) {
+    data.setName(data.getName().trim());
+    Student exists = findByName(data.getName());
+    if (exists != null && !exists.getId().equals(data.getId())) {
+      webError(1000001, "学生姓名已存在");
+    }
+  }
+
+  @Override
+  default void akoPostSave(Student data) {
+    // 保存成功后执行，仍在同一事务中
+  }
+}`,
+    note: 'Java 在 Access 接口里用 default 方法覆盖钩子，效果与 Kotlin 版本相同。',
   },
 ]
 
@@ -168,7 +218,7 @@ transaction {
   student.name = newName
   student.save()
 }`,
-    note: 'AkoRain.instance.transaction 使用 JPA EntityManager；活动事务会复用，否则开始、提交或回滚一个事务。',
+    note: 'AkoRain.instance.transaction 基于 JPA EntityManager：已有活动事务时直接复用，否则开启新事务，成功提交，异常回滚。',
   },
   {
     language: 'Java',
@@ -186,7 +236,7 @@ AkoRain.Companion.getInstance().transaction(() -> {
   studentAccess.saveOrUpdate(student);
   return null;
 });`,
-    note: 'Java 调用 AkoRain 的成员事务入口；实际项目中应从 Rain DI 获取 studentAccess。',
+    note: 'Java 调用 AkoRain 实例上的 transaction 方法；实际项目中 studentAccess 应通过 Rain 依赖注入获得。',
   },
   {
     language: 'Kotlin',
@@ -198,7 +248,7 @@ transaction {
   student.name = newName
   studentRepository.save(student)
 }`,
-    note: 'AkoSpringRuntime.transaction 使用 PlatformTransactionManager/TransactionTemplate，并以 REQUIRED 传播行为执行。',
+    note: 'AkoSpringRuntime.transaction 基于 PlatformTransactionManager 和 TransactionTemplate，传播行为为 REQUIRED。',
   },
   {
     language: 'Java',
@@ -221,7 +271,7 @@ public class StudentService {
     repository.save(student);
   }
 }`,
-    note: 'Spring Java 通常使用 @Transactional；它与 Kotlin 的 transaction { } helper 都委托 PlatformTransactionManager。',
+    note: 'Java 一般直接用 @Transactional；它和 Kotlin 的 transaction { } 一样，最终都交给 PlatformTransactionManager。',
   },
 ]
 
@@ -237,7 +287,7 @@ val access = findAccess<StudentAccess>()
 val sameAccess = student.findAccess()
 student.save()
 student.delete()`,
-    note: 'findAccess/accessOfModel 从 AkoRain.instance.accesses 查找 Rain Access。',
+    note: 'findAccess/accessOfModel 从 AkoRain.instance.accesses 中查找 Access。',
   },
   {
     language: 'Java',
@@ -247,7 +297,7 @@ student.delete()`,
 Student student = new Student();
 access.saveOrUpdate(student);
 access.delete(student);`,
-    note: 'Java 直接调用 Access 的实例方法；Kotlin 的 reified findAccess/accessOfModel 和模型扩展函数不能直接照搬到 Java。',
+    note: 'Java 直接调用 Access 的实例方法；Kotlin 的 reified findAccess/accessOfModel 和模型扩展函数在 Java 中无法直接使用。',
   },
   {
     language: 'Kotlin',
@@ -258,7 +308,7 @@ import ako.spring.\`fun\`.transaction
 val repository = findAccess<StudentRepository>()
 student.save()
 student.delete()`,
-    note: 'Spring 的 findAccess 返回延迟代理；调用 save/delete 时由 AkoSpringRuntime 找到对应模型上下文和 Repository。',
+    note: 'Spring 的 findAccess 返回延迟代理；save/delete 由 AkoSpringRuntime 找到对应的模型上下文，再交给数据库实现。',
   },
   {
     language: 'Java',
@@ -271,7 +321,7 @@ public StudentService(StudentRepository repository) {
 
 repository.save(student);
 repository.delete(student);`,
-    note: 'Java Spring 通过构造器注入 Repository；不需要 companion object 或 Kotlin 扩展函数代理。',
+    note: 'Java 通过构造器注入 Repository，用不到 companion object 和 Kotlin 扩展函数。',
   },
 ]
 </script>
@@ -281,25 +331,25 @@ repository.delete(student);`,
 | 事项 | `ako-rain` | `ako-spring` |
 | --- | --- | --- |
 | 基础接口 | `ako.rain.access.AkoAccess` | `ako.spring.access.AkoAccess` |
-| JPA 具体接口 | SmartAccess `JpaAccess` | Spring Data `JpaRepository` / `AkoJpaRepository` |
-| 发现入口 | Rain `ClassRegister` | Spring `ApplicationContext` + `AkoSpringDatabase` |
+| JPA 接口 | SmartAccess `JpaAccess` | Spring Data `JpaRepository` / `AkoJpaRepository` |
+| 发现方式 | Rain `ClassRegister` | Spring `ApplicationContext` + `AkoSpringDatabase` |
 | 自定义数据库 | 接入 SmartAccess/JPA | 实现并注册 `AkoSpringDatabase` |
 
-`ako-spring-common` 的 `AkoAccess` 不继承 `JpaRepository`，这是有意的：Boot 2/3/4 以及非 Spring Data 数据实现可以共享公共 Runtime。只有引入 `ako-springboot-springdata` 时，才使用 `AkoJpaRepository`、`AkoRepository` 或 `SoftDeleteAccess`。
+`ako-spring-common` 里的 `AkoAccess` 有意不继承 `JpaRepository`，这样 Boot 2/3/4 以及不基于 Spring Data 的数据实现都能共用同一个公共运行时。只有引入 `ako-springboot-springdata` 后，才会用到 `AkoJpaRepository`、`AkoRepository` 或 `SoftDeleteAccess`。
 
 ## 查询
 
-### Rain：SmartAccess 查询
-
 <CodeSwitch :variants="queryExamples" />
 
-两套实现都支持以下 Ako 查询键：`field`/`field_eq`、`field_like`、`field_gt`、`field_gte`、`field_lt`、`field_lte`、`field_ne`、`field_in`、`field_isNull`。适配器必须对白名单字段、操作符、排序字段和排序方向做校验。
+两套实现支持同一组查询键：`field`/`field_eq`、`field_like`、`field_gt`、`field_gte`、`field_lt`、`field_lte`、`field_ne`、`field_in`、`field_isNull`。
 
-Rain 的 `smartaccess.item.Page(0, size)` 是 offset 页对象，而 Ako HTTP 请求的 `page: 1` 表示第一页；Spring 的实现直接在 Criteria Query 上计算 `(page - 1) * size`。两个 API 的页码对象不能混用。
+对查询键的校验两边不一样。Spring 的 `AkoSpringDataDatabase` 会对照模型字段检查查询字段和排序字段，排序方向只接受 `ASC`/`DESC`，不合法就抛异常。Rain 的 `AkoAccess.margeWhereQuery` 和 `wherePage` 会把字段名、排序键原样拼进 HQL，不做白名单校验；而 `IModelController.page` 会把前端传来的 `params` 和 `sort` 直接交给它们。Rain 项目需要在控制器里先按模型字段过滤这两个参数。
 
-## 自定义数据库：Spring SPI
+页码的含义也不同。Rain 的 `smartaccess.item.Page(0, size)` 第一个参数是 offset；Ako HTTP 请求里的 `page: 1` 表示第一页；Spring 的实现直接在 Criteria 查询上按 `(page - 1) * size` 计算 offset。两种页码对象不能混用。
 
-如果 Spring 项目不是 Spring Data JPA，或需要接入其他数据库，可以只使用公共接口：
+## 自定义数据库（Spring）
+
+如果 Spring 项目不用 Spring Data JPA，或者要接入别的数据库，可以只依赖公共接口，自己实现 `AkoSpringDatabase`：
 
 ```kotlin
 @Component
@@ -330,36 +380,60 @@ class BillingDatabase : AkoSpringDatabase {
 }
 ```
 
-`AkoSpringDatabase` 必须声明自己负责的 `modelTypes`，并实现 `whereList`、`wherePage`、`save` 和 `delete`。Runtime 会为每个模型创建 `AkoSpringModelContext`。这条 SPI 是 Spring 与 Rain 的重要差异：Rain 的 `AkoAccess` 直接依赖 SmartAccess，而 Spring 把数据库能力抽象成可替换 Bean。
+实现类要通过 `modelTypes` 声明自己负责哪些模型，并实现 `whereList`、`wherePage`、`save` 和 `delete`。运行时会为每个模型创建一个 `AkoSpringModelContext`。一个模型只能由一个 `AkoSpringDatabase` 提供，重复声明会在初始化时报错。
+
+这是 Spring 和 Rain 的一个重要区别：Rain 的 `AkoAccess` 直接建立在 SmartAccess 之上，Spring 则把数据库能力抽象成可以替换的 Bean。
 
 ## 事务
 
 <CodeSwitch :variants="transactionExamples" />
 
-标准模型 Controller 的 page/save/delete 会进入适配器自己的事务；跨模型更新、普通业务接口和自定义按钮仍应显式包在事务中。事务 API 名称相同，是为了让业务代码保持相似；底层事务管理器不同，所以异常、传播和外部副作用仍需按宿主框架验证。
+标准模型接口（page/save/delete）会自动进入适配器的事务。跨模型更新、普通业务接口和自定义按钮，仍然要自己显式包一层事务。
+
+两边的事务 API 名字相同，方便业务代码保持一致写法；但底层的事务管理器不同，异常处理、事务传播和外部副作用仍要按各自框架验证。
 
 ## 模型扩展函数
 
 <CodeSwitch :variants="modelFunctionExamples" />
 
-Spring 没有 Rain 的 `accessOfModel(Class)` 公共扩展，因为模型到数据实现的映射由 `AkoSpringDatabase.modelTypes` 建立；需要按模型查找时使用 Runtime 的 `modelMap` 或自己的数据库服务。
+Spring 没有 Rain 那样的 `accessOfModel(Class)` 公共扩展，因为模型和数据实现的对应关系由 `AkoSpringDatabase.modelTypes` 决定。需要按模型查找时，使用运行时的 `modelMap` 或自己的数据库服务。
 
 ## 软删除
 
 | 行为 | `ako-rain` | `ako-spring` |
 | --- | --- | --- |
-| 删除入口 | `SoftDeleteAccess` 的 QueryRewriter | `AkoSpringDataDatabase.delete` 判断 `SoftDeleteModel` 后更新 `deleteTime` |
-| 查询过滤 | Hibernate `_ako_soft_delete` Filter | Criteria 查询显式追加 `deleteTime = 0` |
-| 恢复 | 需要业务代码/底层策略 | 需要业务代码/Repository 更新 |
-| 当前注意 | 当前源码的 QueryRewriter 字符串仍写成 `delete form`，应通过集成测试确认 | 当前实现把删除语义写在 Spring Data 数据库适配器中，未依赖 Hibernate Filter |
+| 删除方式 | `SoftDeleteAccess` 用 QueryRewriter 把删除语句改写为更新 `deleteTime` | `AkoSpringDataDatabase.delete` 判断是 `SoftDeleteModel` 后更新 `deleteTime` |
+| 查询过滤 | Hibernate `_ako_soft_delete` Filter（`delete_time = 0`） | Criteria 查询显式追加 `deleteTime = 0` |
+| 恢复数据 | 业务代码自行处理 | 业务代码或 Repository 自行更新 |
+| 注意事项 | 改写规则匹配的是 `delete form` 前缀（与 SmartAccess 生成的单条删除语句一致），因此只对 `delete(id)`/`delete(entity)` 生效；`deleteAll()` 发出的 `delete from ...` 不会被改写，执行的是物理删除 | 删除逻辑写在 Spring Data 数据库实现里，不依赖 Hibernate Filter |
 
-这就是两套框架软删除代码不同的原因：Rain 通过 SmartAccess 的 SQL/HQL 重写扩展删除，Spring 适配器直接控制 Criteria 和 Repository 调用。软删除不是 Ako 协议的一部分，不能只看前端是否刷新来判断是否成功。
+两套代码不同，是因为 Rain 通过 SmartAccess 的语句改写扩展删除，Spring 适配器则直接控制 Criteria 查询和 Repository 调用。软删除不属于 Ako 协议，判断删除是否成功要看数据库里的数据，不能只看前端有没有刷新。
 
-## 保存生命周期与安全
+## 保存钩子
 
-`ModelContext` 提供 `akoPreSave` 和 `akoPostSave` 扩展点。两套当前默认上下文都不替业务完成权限、唯一性和审计；这些逻辑应放在服务/控制器中，并在 `page`、`save`、`delete` 每次请求独立鉴权。
+从 JVM `0.0.16` 起，`ako-rain` 的 `AkoAccess` 提供两个保存钩子，默认都是空实现：
 
-- 不要把客户端字段名未经白名单直接传给 HQL 或 Criteria。
-- 不要只用前端 `validate` 保护数据。
-- 不要把批量删除当作普通单条删除，需单独限制数量并审计。
-- 不要把事务块中的外部消息、文件或支付副作用误认为会自动回滚。
+```kotlin
+fun akoPreSave(data: T) {}
+fun akoPostSave(data: T) {}
+```
+
+前端调用 `model/save/{model}` 时，Ako 按 `akoPreSave → 保存 → akoPostSave` 的顺序执行。在 Access 接口里覆盖它们，就可以在保存前补全字段、做业务校验，或在保存后同步其他数据：
+
+<CodeSwitch :variants="saveHookExamples" />
+
+使用时注意：
+
+- Rain 的 `IModelController.save` 整体运行在 `transaction {}` 中，钩子和保存处于同一个事务。`akoPreSave` 里抛出异常会中止保存并回滚，适合做唯一性校验这类“不通过就拒绝”的检查。
+- 钩子只在经过 `Model.save` 的标准保存流程中触发。业务代码直接调用 `saveOrUpdate()`，或使用 Kotlin 扩展函数 `save()`，都不会经过钩子。
+- 新增和编辑走同一个钩子，需要区分时可以判断 `data.id` 是否为 `null`。
+- `ako-spring` 的 `AkoSpringModelContext` 中这两个钩子仍是空实现，Spring 项目暂时没有覆盖入口。相关逻辑请放在自定义的 `AkoSpringDatabase.save` 或业务服务中。
+
+## 安全
+
+默认的模型上下文不会替你处理权限、唯一性和审计。这些逻辑应写在保存钩子、服务或控制器中，并且 `page`、`save`、`delete` 每次请求都要单独鉴权。另外几点：
+
+- 客户端传来的字段名必须先经过白名单校验，再交给 HQL 或 Criteria。
+- 前端的 `validate` 只改善体验，数据校验要在服务端再做一遍。
+- 批量删除要单独限制数量并记录审计，不能当作普通的单条删除处理。
+- 事务只回滚数据库操作；事务块里发出的消息、写入的文件、发起的支付不会随之撤销。

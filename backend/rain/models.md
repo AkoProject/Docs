@@ -1,17 +1,17 @@
 ---
 title: 实体模型
-description: 在 ako-rain 或 ako-spring 中声明 JVM 实体、数据访问入口和页面字段。
+description: 在 ako-rain 或 ako-spring 中声明实体、数据访问入口和页面字段。
 ---
 
 # 实体模型
 
-`ako-rain` 和 `ako-spring` 都使用 `ako-core`/`ako-jpa` 的模型元数据。实体上的 Ako 注解决定前端看到的名称、字段类型、搜索、表格、编辑和按钮；框架差异主要出现在“谁发现模型”和“谁负责数据访问”。
+`ako-rain` 和 `ako-spring` 共用 `ako-core` 与 `ako-jpa` 中的模型元数据。实体上的 Ako 注解决定前端显示的名称、字段类型、搜索条件、表格列、编辑表单和按钮。两套框架只在两件事上不同：由谁发现模型，由谁负责数据访问。
 
-这里的 Spring Data 示例针对 Boot 3/4 的 Jakarta Persistence。Boot 2 的 `ako-spring-common` 不要求使用 `ako-jpa`，如果应用仍基于 `javax.persistence`，请按 [项目创建](/backend/rain/project) 的公共 SPI 路径提供模型和数据库实现。
+本页的 Spring Data 示例基于 Spring Boot 3/4 和 Jakarta Persistence。Boot 2 使用的 `ako-spring-common` 不依赖 `ako-jpa`；如果应用仍在用 `javax.persistence`，请按 [项目创建](/backend/rain/project) 中的公共 SPI 方式自行提供模型和数据库实现。
 
 ## 最小模型
 
-下面的代码块是同一个“学生”模型在两套实现中的 Java/Kotlin 写法。选择一次语言和 `ako-rain`/`ako-spring` 框架后，本网站其他 JVM 差异代码会跟随切换。
+同一个“学生”模型在两套框架中的写法如下。切换一次语言或框架，本站其他 JVM 示例会一起切换。
 
 <script setup lang="ts">
 const modelExamples = [
@@ -40,7 +40,7 @@ data class Student(
 }
 
 interface StudentAccess : SoftDeleteAccess<Student, Int>` ,
-    note: 'Rain 通过 ClassRegister 发现 StudentAccess，再从 SmartAccess 获取它的实现。测试代码使用 data class；复杂 JPA 场景仍应按实体代理要求验证。',
+    note: 'Rain 通过 ClassRegister 发现 StudentAccess，再从 Rain DI 容器取得它的实现。示例沿用测试代码中的 data class 写法；依赖 JPA 代理（如懒加载）的实体请另行验证。',
   },
   {
     language: 'Java',
@@ -70,7 +70,7 @@ public class Student extends CompleteModel {
 }
 
 interface StudentAccess extends SoftDeleteAccess<Student, Integer> {}`,
-    note: 'Java Rain 实体不使用 Kotlin 伴生对象；通过 Rain DI 获取 StudentAccess。类和字段使用标准 JavaBean 访问器，便于 JPA 和 JSON 绑定。',
+    note: 'Java 版没有 Kotlin 的伴生对象，StudentAccess 通过 Rain DI 获取。实体提供标准 JavaBean 访问器，供 JPA 和 JSON 绑定使用。',
   },
   {
     language: 'Kotlin',
@@ -97,7 +97,7 @@ open class Student : CompleteModel() {
 }
 
 interface StudentRepository : SoftDeleteAccess<Student, Int>` ,
-    note: 'Spring Data JPA 需要 Repository Bean；示例使用 open class/open var 以适配 JPA 代理。SoftDeleteAccess 是 Spring Data 版本的 Repository 基类。',
+    note: 'Spring Data JPA 需要 Repository Bean。示例用 open class/open var，让 JPA 能生成代理；这里的 SoftDeleteAccess 是 Spring Data 版的 Repository 基类。',
   },
   {
     language: 'Java',
@@ -127,7 +127,7 @@ public class Student extends CompleteModel {
 }
 
 interface StudentRepository extends SoftDeleteAccess<Student, Integer> {}`,
-    note: 'Java Spring 使用 Spring Data Repository Bean；JavaBean 访问器满足 JPA/JSON 绑定，不需要 Kotlin 的 companion object 或 open var。',
+    note: 'Java 版同样使用 Spring Data Repository Bean。JavaBean 访问器即可满足 JPA 和 JSON 绑定，不需要 companion object 或 open var。',
   },
   {
     language: 'JSON',
@@ -146,7 +146,7 @@ interface StudentRepository extends SoftDeleteAccess<Student, Integer> {}`,
     }
   ]
 }`,
-    note: '协议结果与后端宿主无关；Rain 和 Spring 最终都应生成同样可被 Ako 前端消费的 DbModel。',
+    note: '协议结果与后端框架无关。Rain 和 Spring 生成的 DbModel 结构相同，Ako 前端可以直接使用。',
   },
 ]
 
@@ -162,7 +162,7 @@ val rows = Student.whereQuery(
   mapOf("name_like" to "Alice"),
   sort = mapOf("age" to "desc"),
 )`,
-    note: 'Rain 自定义方法和分页查询使用 SmartAccess/JPA API。',
+    note: 'Rain 的自定义方法和分页查询使用 SmartAccess/JPA 的 API。',
   },
   {
     language: 'Java',
@@ -178,7 +178,7 @@ List<Student> rows = access.whereQuery(
   new Page(0, 20),
   "ASC"
 );`,
-    note: 'Java 通过 Rain DI 注入或查找 StudentAccess；SmartAccess 的 Page 使用从 0 开始的 offset。',
+    note: 'Java 通过 Rain DI 注入或查找 StudentAccess。SmartAccess 的 Page 使用从 0 开始的 offset。',
   },
   {
     language: 'Kotlin',
@@ -192,7 +192,7 @@ interface StudentRepository : SoftDeleteAccess<Student, Int> {
 val rows = repository.findAll(
   org.springframework.data.domain.Sort.by("age").descending(),
 )`,
-    note: 'Spring Data 自定义方法遵循 Repository 派生查询规则；Ako 动态 page 请求由 AkoSpringDataDatabase 使用 Criteria API 处理。',
+    note: '自定义方法遵循 Spring Data 的派生查询规则。Ako 前端发来的 page 请求由 AkoSpringDataDatabase 用 Criteria API 处理。',
   },
   {
     language: 'Java',
@@ -207,7 +207,7 @@ List<Student> rows = studentRepository.findByNameContainingIgnoreCase("Alice");
 List<Student> ordered = studentRepository.findAll(
   Sort.by("age").descending()
 );`,
-    note: 'Java Spring 直接注入 StudentRepository；领域查询使用 Spring Data 派生方法，Ako 通用 page 请求仍由 Criteria API 处理。',
+    note: 'Java 版直接注入 StudentRepository，业务查询用 Spring Data 派生方法；Ako 的通用 page 请求仍由 Criteria API 处理。',
   },
 ]
 
@@ -223,7 +223,7 @@ var group: Int = 0
 @DbName("性别")
 @DbEnum("男", "女")
 var sex: Boolean = false`,
-    note: '关系和枚举注解属于 Ako 共同模型层，Rain 只负责发现并提供数据访问。',
+    note: '关联和枚举注解属于 Ako 的公共模型层，Rain 只负责发现模型和提供数据访问。',
   },
   {
     language: 'Java',
@@ -236,7 +236,7 @@ private int group;
 @DbName("性别")
 @DbEnum({"男", "女"})
 private boolean sex;`,
-    note: 'Java 使用 Group.class 和数组注解参数；元数据效果与 Kotlin 写法相同。',
+    note: 'Java 写成 Group.class 和数组参数，生成的元数据与 Kotlin 相同。',
   },
   {
     language: 'Kotlin',
@@ -249,7 +249,7 @@ open var group: Int = 0
 @DbName("性别")
 @DbEnum("男", "女")
 open var sex: Boolean = false`,
-    note: '关系和枚举注解不依赖 Spring；Spring Data 负责将关联模型接入 Repository 查询。',
+    note: '关联和枚举注解不依赖 Spring，关联模型的数据由 AkoSpringDataDatabase 查询。',
   },
   {
     language: 'Java',
@@ -262,7 +262,7 @@ private int group;
 @DbName("性别")
 @DbEnum({"男", "女"})
 private boolean sex;`,
-    note: 'Java Spring 使用标准 Java 字段和注解；Spring 与 Rain 最终生成相同的 DbField 元数据。',
+    note: 'Java 版在普通字段上加注解即可，生成的 DbField 元数据与 Rain 相同。',
   },
 ]
 
@@ -280,7 +280,7 @@ const fieldVisibilityExamples = [
   @EditIgnore
   var createdAt: Long = 0,
 ) : CompleteModel()`,
-    note: '这些显示注解在 Rain 和 Spring 中共享，只影响前端元数据区域。',
+    note: '这三个注解在 Rain 和 Spring 中通用，只影响元数据中对应的区域。',
   },
   {
     language: 'Java',
@@ -297,7 +297,7 @@ const fieldVisibilityExamples = [
 
   // JavaBean getters/setters omitted
 }`,
-    note: 'Java 用字段注解表达相同的搜索、表格和编辑隐藏规则。',
+    note: 'Java 在字段上加同样的注解，即可在搜索、表格或编辑中隐藏字段。',
   },
   {
     language: 'Kotlin',
@@ -312,7 +312,7 @@ const fieldVisibilityExamples = [
   @EditIgnore
   open var createdAt: Long = 0
 }`,
-    note: 'Spring Data JPA 场景保留 open class/open var，以便 JPA 代理工作。',
+    note: 'Spring Data JPA 场景保留 open class/open var，让 JPA 能生成代理。',
   },
   {
     language: 'Java',
@@ -329,7 +329,7 @@ const fieldVisibilityExamples = [
 
   // JavaBean getters/setters omitted
 }`,
-    note: 'Java 类天然可被 Spring/JPA 代理；仍需提供标准 JavaBean 访问器。',
+    note: 'Java 类默认就能被 Spring/JPA 代理，但仍需提供标准 JavaBean 访问器。',
   },
 ]
 
@@ -352,7 +352,7 @@ class Order : CompleteModel()`,
     tableNode = "sales-order-table"
 )
 public class Order extends CompleteModel {}`,
-    note: 'Java 使用标准注解命名参数；前端节点效果与 Kotlin 相同。',
+    note: 'Java 用命名参数写法，效果与 Kotlin 相同。',
   },
   {
     language: 'Kotlin',
@@ -362,7 +362,7 @@ public class Order extends CompleteModel {}`,
   tableNode = "sales-order-table",
 )
 open class Order : CompleteModel()`,
-    note: 'Spring 也只把节点名写入 DbModel，不会因为注解自动注册 Vue 组件。',
+    note: 'Spring 同样只把节点名写入 DbModel，不会自动注册 Vue 组件。',
   },
   {
     language: 'Java',
@@ -372,14 +372,14 @@ open class Order : CompleteModel()`,
     tableNode = "sales-order-table"
 )
 public class Order extends CompleteModel {}`,
-    note: 'Java Spring 使用相同的 ModelNode；组件仍需在 Vue App 中注册。',
+    note: 'Java Spring 写法相同，组件仍需在 Vue App 中注册。',
   },
 ]
 </script>
 
 <CodeSwitch :variants="modelExamples" />
 
-两段 JVM 代码的差异不是 Ako 模型定义差异：Rain 的 Access 是 SmartAccess 的 `JpaAccess`，Spring 的 Repository 是 Spring Data 的 `JpaRepository`。共同的 `@DbName`、`@Entity`、`CompleteModel` 和字段元数据仍然保持一致。
+两套写法只在数据访问层不同：Rain 的 Access 基于 SmartAccess 的 `JpaAccess`，Spring 的 Repository 基于 Spring Data 的 `JpaRepository`。`@DbName`、`@Entity`、`CompleteModel` 和字段注解完全一样。
 
 ## Access 与 Repository
 
@@ -387,57 +387,59 @@ public class Order extends CompleteModel {}`,
 | --- | --- | --- |
 | 数据访问入口 | `ako.rain.access.AkoAccess<T, PK>` | `ako.spring.access.AkoAccess<T, PK>`；使用 Spring Data 时通常继承 `AkoJpaRepository<T, ID>` |
 | 软删除入口 | `ako.rain.access.SoftDeleteAccess` | `ako.spring.data.SoftDeleteAccess` 或 `AkoSoftDeleteRepository` |
-| 发现方式 | Rain `ClassRegister` 注册 Access 接口 | Spring 容器发现 Repository Bean，或发现 `AkoSpringDatabase` Bean 提供的模型类型 |
-| `findAccess()` | 返回 Rain 容器中的 Access | 返回延迟解析 Spring Bean 的代理；调用时再从 `ApplicationContext` 查找目标 Repository |
+| 发现方式 | Rain `ClassRegister` 注册 Access 接口 | 从 `AkoSpringDatabase` Bean 的 `modelTypes` 读取模型；Spring Data 模块的实现会收集容器中的 Repository Bean |
+| `findAccess()` | 返回 Rain 容器中的 Access | 返回一个代理，每次调用时才从 `ApplicationContext` 查找目标 Repository |
 | 自定义数据库 | 需要接入 SmartAccess/JPA | 实现并注册 `AkoSpringDatabase`，不必使用 Spring Data |
 
-Spring 的 `ako-spring-common` 故意不让公共 `AkoAccess` 继承 `JpaRepository`，这样 Boot 2/3/4 和非 Spring Data 数据实现可以共享 Runtime。只有 `ako-springboot-springdata` 才提供 `AkoJpaRepository` 等 Repository 基类。
+`ako-spring-common` 中的公共 `AkoAccess` 有意不继承 `JpaRepository`。这样 Boot 2/3/4 和不基于 Spring Data 的数据实现可以共用同一个运行时。`AkoJpaRepository` 等 Repository 基类只在 `ako-springboot-springdata` 中提供。
 
-## 关系与枚举
+## 关联与枚举
 
-字段注解在两套实现中相同：
+字段注解在两套框架中写法相同：
 
 <CodeSwitch :variants="relationExamples" />
 
-`@Mapping` 会生成 `ako:mapping`，分页结果中的 `information` 负责补充关联模型；`@DbEnum` 和原生枚举会生成 `ako:enum`。关联目标模型也必须被对应框架发现。类型的 JSON 结构见 [字段类型与选项](/protocol/types)。
+`@Mapping` 生成 `ako:mapping` 类型，分页结果的 `information` 会附带关联模型的数据。`@DbEnum`、枚举类型字段和布尔字段生成 `ako:enum` 类型。关联的目标模型也必须能被对应框架发现。类型的 JSON 结构见 [字段类型与选项](/protocol/types)。
 
 ## 自定义查询
 
-自定义查询的写法体现了两套数据访问库的差异：
+两套数据访问库的差异主要体现在自定义查询上：
 
 <CodeSwitch :variants="queryExamples" />
 
-不要把一套数据访问 API 的查询对象传给另一套框架。无论哪套实现，都要对前端传入的字段、操作符和排序方向做白名单校验。
+两套框架的查询对象不能混用。无论用哪套，都要对前端传入的字段名、操作符和排序方向做白名单校验。
 
 ## 控制字段显示
 
-字段可以分别参与搜索、表格和编辑：
+一个字段可以分别决定是否出现在搜索区、表格和编辑表单中：
 
 <CodeSwitch :variants="fieldVisibilityExamples" />
 
-- `@SearchIgnore`：不生成 `search`。
-- `@TableIgnore`：不生成 `column`。
-- `@EditIgnore`：不生成 `edit`。
+| 注解 | 效果 |
+| --- | --- |
+| `@SearchIgnore` | 不生成 `search`，字段不出现在搜索区 |
+| `@TableIgnore` | 不生成 `column`，字段不出现在表格 |
+| `@EditIgnore` | 不生成 `edit`，字段不出现在编辑表单 |
 
-名称、描述、排序、校验和节点注解见 [注解功能](/backend/rain/annotations)。如果字段不应该暴露给浏览器，应在后端 DTO/序列化层同时处理，不能只依赖显示忽略注解。
+名称、描述、排序、校验和节点注解见 [注解功能](/backend/rain/annotations)。这三个注解只控制页面显示，字段值仍会出现在接口返回的实体 JSON 里。不该暴露给浏览器的字段，要在后端的 DTO 或序列化配置中排除。
 
 ## 自定义页面节点
 
-`@ModelNode` 在两套框架中也完全相同，它指定前端组件注册名，而不是后端路由：
+`@ModelNode` 在两套框架中也完全相同。它的值是前端组件的注册名，与后端路由无关：
 
 <CodeSwitch :variants="modelNodeExamples" />
 
-前端需要注册同名组件；完整 props 和替换方式见 [前端参考](/frontend/reference) 与 [使用 Ako View 构建页面](/frontend/views)。
+前端需要注册同名组件。组件的 props 和替换方式见 [前端参考](/frontend/reference) 与 [使用 Ako View 构建页面](/frontend/views)。
 
-## 模型排除与 ID
+## 排除模型与主键类型
 
-给类加 `@NoAkoModel`，模型仍可被 ORM 使用，但不会进入 Ako 菜单和模型列表。给字段加 `@NoAkoField`，字段不会被 Ako 处理，也不会出现在元数据中；适合隐藏内部状态、更新时间和删除时间。
+类上加 `@NoAkoModel` 后，模型仍可被 ORM 使用，但不会出现在 Ako 菜单和模型列表中。字段上加 `@NoAkoField` 后，Ako 完全忽略这个字段，元数据中也不会出现它。JPA 基类就是用它隐藏了更新时间和删除时间。
 
-JVM + JPA 方向同时支持 Int、Long 和 UUID 基础模型。协议层把 ID 看成可序列化标量，删除请求使用字符串数组也可以承载 UUID 和大整数。前端自定义 API 或 TypeScript 类型不要把所有 ID 固定成 `number`。
+`ako-jpa` 提供 Int、Long 和 UUID 三种主键的基类。协议层把 ID 当作可序列化的标量，删除接口接收字符串数组，因此 UUID 和大整数都能传递。前端自定义 API 或 TypeScript 类型时，不要把 ID 固定写成 `number`。
 
-## 为什么只改 Access/Repository
+## 切换框架时要改什么
 
-Ako 的模型声明位于 `ako-core`/`ako-jpa`，而 Access/Repository 是适配器边界：
+模型声明属于 `ako-core` 和 `ako-jpa`，Access 和 Repository 则属于各自的适配器：
 
 ```text
 同一套 Entity + Ako 注解
@@ -445,4 +447,5 @@ Ako 的模型声明位于 `ako-core`/`ako-jpa`，而 Access/Repository 是适配
        └── ako-spring → AkoJpaRepository/AkoSpringDatabase → Spring Data/自定义数据库
 ```
 
-这使前端菜单、字段和页面不随 JVM Web 框架改变；只有启动、发现、数据访问和控制器代码需要切换。
+因此更换 JVM Web 框架时，前端的菜单、字段和页面都不受影响，只需要调整启动、模型发现、数据访问和控制器代码。
+

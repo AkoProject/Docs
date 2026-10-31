@@ -1,21 +1,21 @@
 ---
 title: 项目创建
-description: 创建 ako-rain 或 ako-spring JVM 后端项目，并选择匹配的 Web 与数据访问实现。
+description: 创建 ako-rain 或 ako-spring 后端项目，选好对应的 Web 框架和数据访问实现。
 ---
 
 # 项目创建
 
-Ako 的 JVM 后端有两种实现。先确认自己的应用宿主，再复制对应的依赖和启动配置：
+Ako 的后端（JVM）有两套实现。先看你的项目建在哪个框架上，再复制对应的依赖和启动配置：
 
-- 已经使用 Rain、SmartWeb、SmartAccess：选择 `ako-rain`。
-- 已经使用 Spring Boot、Spring MVC、Spring Data JPA：选择 `ako-spring`。
-- Spring Boot 2 使用 `javax.persistence` 时，使用 Spring 公共运行时并自行提供数据库实现；Boot 3/4 才使用仓库中提供的 Spring Data JPA 适配器。
+- 已经在用 Rain、SmartWeb、SmartAccess：选 `ako-rain`。
+- 已经在用 Spring Boot、Spring MVC、Spring Data JPA：选 `ako-spring`。
+- Spring Boot 2 搭配 `javax.persistence`：使用 Spring 公共运行时，自己提供数据库实现。仓库自带的 Spring Data JPA 适配器只用于 Boot 3/4。
 
-如果你还没有宿主项目，请先阅读 [Rain 快速开始](https://rain.icecreamqaq.com/guide/getting-started) 或 [Spring Boot 文档](https://docs.spring.io/spring-boot/docs/current/reference/html/)。下面 JVM 代码块可以切换 Java/Kotlin，框架和语言选择会在全站保持，并写入浏览器 `localStorage`。
+还没有项目的话，先阅读 [Rain 快速开始](https://rain.icecreamqaq.com/guide/getting-started) 或 [Spring Boot 文档](https://docs.spring.io/spring-boot/docs/current/reference/html/) 把空项目建起来。
 
-## 依赖方式
+## 添加依赖
 
-`ako-rain` 依赖 Rain、SmartWeb 和 SmartAccess；`ako-spring` 依赖对应的 Spring Boot 自动配置和数据访问模块。两套依赖如下：
+`ako-rain` 依赖 Rain、SmartWeb 和 SmartAccess；`ako-spring` 依赖对应版本的 Spring Boot 自动配置模块和数据访问模块：
 
 <script setup lang="ts">
 const dependencyExamples = [
@@ -40,7 +40,7 @@ dependencies {
   implementation("com.IceCreamQAQ.SmartAccess:hibernate5:$smartAccessVersion")
   runtimeOnly("com.h2database:h2:<h2-version>")
 }`,
-    note: 'Rain 依赖其 Application、SmartWeb 和 SmartAccess 生态；版本以 JVM 根项目和 framework/rain/build.gradle.kts 为准。',
+    note: 'Rain 需要 Application、Controller、SmartWeb 和 SmartAccess 几个模块；Rain 相关版本以 framework/rain/build.gradle.kts 为准。',
   },
   {
     language: 'Kotlin DSL',
@@ -54,7 +54,7 @@ dependencies {
   implementation("org.springframework.boot:spring-boot-starter-data-jpa")
   runtimeOnly("com.h2database:h2:<h2-version>")
 }`,
-    note: 'Spring 的 Boot 自动配置、Spring MVC 和 Spring Data JPA 由宿主的 dependency management 提供版本；Boot 2 请看本页的兼容说明。',
+    note: 'Spring MVC 和 Spring Data JPA 的版本由项目的 Spring Boot 依赖管理决定；Boot 2 见下文“Spring Boot 2 项目”。',
   },
 ]
 
@@ -74,7 +74,7 @@ const layoutExamples = [
 
 src/main/resources/conf/
 └── application.properties`,
-    note: 'Rain 使用模块配置、扫描范围和 SmartWeb 控制器。',
+    note: 'Rain 项目由模块配置、扫描范围和 SmartWeb 控制器组成。',
   },
   {
     language: 'Java',
@@ -91,7 +91,7 @@ src/main/resources/conf/
 
 src/main/resources/conf/
 └── application.properties`,
-    note: 'Java Rain 项目使用 src/main/java；Rain 的模块配置、扫描范围和 SmartWeb 控制器目录不变。',
+    note: 'Java 项目把源码放在 src/main/java，其余结构与 Kotlin 项目相同。',
   },
   {
     language: '目录',
@@ -109,7 +109,7 @@ src/main/resources/conf/
 
 src/main/resources/
 └── application.yml`,
-    note: 'Spring 使用 Boot 自动配置、组件扫描、Spring MVC Controller 和 Spring Data Repository。',
+    note: 'Spring 项目由 Boot 自动配置、组件扫描、Spring MVC Controller 和 Spring Data Repository 组成。',
   },
   {
     language: 'Java',
@@ -127,7 +127,7 @@ src/main/resources/
 
 src/main/resources/
 └── application.yml`,
-    note: 'Java Spring 项目使用 src/main/java；Boot 自动配置、Spring MVC Controller 和 Repository 的组织方式不变。',
+    note: 'Java 项目把源码放在 src/main/java，其余结构与 Kotlin 项目相同。',
   },
 ]
 
@@ -142,7 +142,7 @@ import rain.application.FullStackApplicationLauncher
 fun main() {
   FullStackApplicationLauncher.launch()
 }`,
-    note: '完整启动器负责 Rain 的应用类加载、模块初始化和扫描；ako-rain 再由 Rain 模块配置注册 AkoRain。',
+    note: 'FullStackApplicationLauncher 负责 Rain 的类加载、模块初始化和扫描；AkoRain 由 ako-rain 自带的 Rain 模块配置注册。',
   },
   {
     language: 'Java',
@@ -156,7 +156,7 @@ public final class Application {
     FullStackApplicationLauncher.launch();
   }
 }`,
-    note: 'Java 直接调用 Rain 的 JVM 启动器；AkoRain 仍由 Rain 模块配置注册。',
+    note: 'Java 直接调用 Rain 的启动器；AkoRain 同样由 Rain 模块配置注册。',
   },
   {
     language: 'Kotlin',
@@ -172,7 +172,7 @@ class Application
 fun main(args: Array<String>) {
   runApplication<Application>(*args)
 }`,
-    note: '对应的 Boot 自动配置会注册 AkoSpringRuntime；Spring 通过 ApplicationContext 发现数据库实现和 Repository Bean。',
+    note: 'Boot 自动配置会注册 AkoSpringRuntime；数据库实现和 Repository Bean 由 Spring 的 ApplicationContext 提供。',
   },
   {
     language: 'Java',
@@ -188,7 +188,7 @@ public class Application {
     SpringApplication.run(Application.class, args);
   }
 }`,
-    note: 'Java 使用 SpringApplication.run 启动；Boot 自动配置会注册 AkoSpringRuntime。',
+    note: 'Java 用 SpringApplication.run 启动；Boot 自动配置会注册 AkoSpringRuntime。',
   },
 ]
 
@@ -206,7 +206,7 @@ db.url=jdbc:h2:./h2db/ako
 db.username=h2
 db.password=h2
 db.dialect=org.hibernate.dialect.H2Dialect`,
-    note: 'Rain 的配置键由 Rain、SmartWeb 和 SmartAccess 提供；ako-rain 模块本身还会注册 AkoRain。',
+    note: '这些配置项分别属于 Rain、SmartWeb 和 SmartAccess；AkoRain 由 ako-rain 自带的 conf/module/ako.properties 注册，不用手动配置。',
   },
   {
     language: 'YAML',
@@ -223,28 +223,28 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update`,
-    note: 'Spring Boot 使用 server、spring.datasource 和 spring.jpa 配置；Bean 与 Repository 由组件扫描和 @EnableJpaRepositories 管理。',
+    note: '使用 Spring Boot 标准的 server、spring.datasource 和 spring.jpa 配置；Bean 和 Repository 由组件扫描和 @EnableJpaRepositories 负责。',
   },
 ]
 </script>
 
 <CodeSwitch :variants="dependencyExamples" />
 
-### Spring 模块如何组合
+### Spring 模块怎么组合
 
-| 模块 | 用途 | 适用版本 |
+| 模块 | 用途 | 适用范围 |
 | --- | --- | --- |
-| `ako-spring-common` | `AkoSpringRuntime`、`AkoSpringDatabase`、事务和模型上下文。 | Boot 2/3/4，或自定义 Spring 应用。 |
-| `ako-springboot-2` | Boot 2.7 自动配置。 | Java 8、`javax` 生态；数据库层需要自定义。 |
+| `ako-spring-common` | `AkoSpringRuntime`、`AkoSpringDatabase`、事务和模型上下文。 | Boot 2/3/4，或自行组装的 Spring 应用。 |
+| `ako-springboot-2` | Boot 2.7 自动配置。 | Java 8、`javax` 生态；数据库层需要自己实现。 |
 | `ako-springboot-3` | Boot 3 自动配置。 | Java 17、Jakarta 生态。 |
 | `ako-springboot-4` | Boot 4 自动配置。 | Java 17、Spring Framework 7。 |
-| `ako-springboot-springdata` | Spring Data JPA 数据库实现。 | Boot 3/4。 |
+| `ako-springboot-springdata` | 基于 Spring Data JPA 的数据库实现。 | Boot 3/4。 |
 
-`ako-springboot-springdata` 使用 Jakarta Persistence 和 Spring Data JPA 的公共 API，因此不与 Boot 2 的 `javax.persistence` 技术栈混用。这是模块拆分的原因，不是 Ako 模型或注解在不同 Boot 版本上有两套定义。
+`ako-springboot-springdata` 基于 Jakarta Persistence 和 Spring Data JPA 的公共 API，不能和 Boot 2 的 `javax.persistence` 混用，所以单独拆成一个模块。Ako 的模型和注解在各个 Boot 版本上是同一套定义。
 
-### Spring Boot 2 兼容路径
+### Spring Boot 2 项目
 
-如果项目仍在 Boot 2.7 和 `javax.persistence` 技术栈上，可以只引入 Boot 2 自动配置和公共运行时，再自行实现 `AkoSpringDatabase`：
+如果项目还在 Boot 2.7 和 `javax.persistence` 上，只引入 Boot 2 自动配置（它会带上公共运行时），再自己实现 `AkoSpringDatabase`：
 
 ```kotlin
 dependencies {
@@ -254,38 +254,38 @@ dependencies {
 }
 ```
 
-这条路径保留了 `AkoSpringRuntime`、菜单/模型协议和事务入口，但数据库模型发现与 CRUD 由你的 `AkoSpringDatabase` 提供。这样可以避免把 Boot 2 的 `javax.persistence` 与 `ako-jpa`/Spring Data 的 Jakarta API 混在一起；完整 SPI 见 [数据访问与事务](/backend/rain/data-access)。
+这样仍然可以使用 `AkoSpringRuntime`、菜单/模型接口和事务入口，模型发现和增删改查则交给你的 `AkoSpringDatabase`。Boot 2 的 `javax.persistence` 也就不会和 `ako-jpa`、Spring Data 使用的 Jakarta API 混在一起。接口定义见 [数据访问与事务](/backend/rain/data-access)。
 
 ## 推荐目录
 
-业务模型和 Ako 注解可以共享；宿主配置、控制器和数据访问入口不同：
+业务模型和 Ako 注解两边通用；宿主配置、控制器和数据访问入口各不相同：
 
 <CodeSwitch :variants="layoutExamples" />
 
-Rain 项目通常把 Ako 模块配置放在 `conf` 下并依赖扫描；Spring 项目通常由 Boot 自动配置和 `application.yml` 管理 Bean、数据源和 JPA。目录可以调整，关键是模型/Access 或 Repository 必须能被对应运行时发现。
+Rain 项目一般把配置放在 `conf` 目录下，靠扫描发现组件；Spring 项目一般由 Boot 自动配置和 `application.yml` 管理 Bean、数据源和 JPA。目录可以按需调整，只要模型、Access 或 Repository 能被对应的运行时发现即可。
 
 ## 启动入口
 
 <CodeSwitch :variants="launcherExamples" />
 
-这两段代码不同，是因为 Rain 的增强类加载/模块生命周期和 Spring Boot 的 ApplicationContext 生命周期不同。它们启动后都会建立 Ako Runtime，但 Runtime 的初始化来源不同。
+两段代码不同，是因为 Rain 有自己的类加载增强和模块生命周期，Spring Boot 则围绕 ApplicationContext 运转。两者启动后都会创建 Ako 运行时，只是创建的时机和方式不同。
 
 ## 基础配置
 
 <CodeSwitch :variants="configurationExamples" />
 
-生产环境请分别按照 [Rain 配置](https://rain.icecreamqaq.com/) 或 [Spring Boot 外部化配置](https://docs.spring.io/spring-boot/docs/current/reference/html/features.html#features.external-config) 配置真实数据库、连接池、日志和安全策略。不要把示例中的 H2、端口和密码直接用于生产。
+示例里的 H2、端口和密码只用于本地开发。生产环境请参照 [Rain 配置](https://rain.icecreamqaq.com/) 或 [Spring Boot 外部化配置](https://docs.spring.io/spring-boot/docs/current/reference/html/features.html#features.external-config)，配置真实的数据库、连接池、日志和安全策略。
 
-## 创建后的检查顺序
+## 创建后检查
 
-1. 确认应用能启动，且业务包已经进入宿主框架的扫描范围。
-2. 确认对应的 Ako Runtime 已注册：Rain 是 `AkoRain`，Spring 是 `AkoSpringRuntime`。
-3. 创建一个实体模型和一个数据访问入口：Rain 使用 `AkoAccess`，Spring Data 使用 `AkoJpaRepository`/`AkoRepository`。
+1. 应用能正常启动，业务包在宿主框架的扫描范围内。
+2. Ako 运行时已注册：Rain 是 `AkoRain`，Spring 是 `AkoSpringRuntime`。
+3. 创建一个实体模型和对应的数据访问入口：Rain 用 `AkoAccess`，Spring Data 用 `AkoJpaRepository`/`AkoRepository`。
 4. 挂载 `menu/list/{channel}`、`model/page/{model}`、`model/save/{model}` 和 `model/delete/{model}`。
-5. 前端把 `baseUrl` 指向这些路由，并先检查认证和菜单接口。
-6. 再添加关联、枚举、按钮和自定义校验。
+5. 把前端的 `baseUrl` 指向这些路由，先确认认证和菜单接口正常。
+6. 再逐步加上关联、枚举、按钮和自定义校验。
 
-完成后先访问：
+完成后先访问这几个接口：
 
 ```text
 GET  /api/ako/auth/isAuth
@@ -293,8 +293,8 @@ GET  /api/ako/menu/list/manager
 POST /api/ako/model/page/Student
 ```
 
-如果 `models` 为空，Rain 优先检查 ClassRegister、`rain.scanPackages` 和 Access；Spring 优先检查 Repository Bean、`@EnableJpaRepositories`/组件扫描和 `AkoSpringDatabase` Bean。
+如果返回的 `models` 为空：Rain 项目先检查 ClassRegister、`rain.scanPackages` 和 Access；Spring 项目先检查 Repository Bean、`@EnableJpaRepositories` 或组件扫描范围，以及 `AkoSpringDatabase` Bean。
 
-## 当前版本
+## 版本
 
-JVM 根项目当前版本为 `0.0.15`。Rain、Spring Boot、Spring Framework、Spring Data JPA 和 SmartAccess 的版本线必须与目标运行时匹配；复制依赖前请以对应模块的 `build.gradle.kts` 和制品仓库为准。
+JVM 根项目的版本为 `0.0.17`。Rain、Spring Boot、Spring Framework、Spring Data JPA 和 SmartAccess 的版本要与项目实际使用的版本线一致；复制依赖前，请以对应模块的 `build.gradle.kts` 和制品仓库为准。
